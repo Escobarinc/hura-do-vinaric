@@ -10,10 +10,10 @@
  * Souřadnice světa: x = východ, z = jih.
  */
 import * as THREE from 'three';
-import { Crowd } from './crowd.js?v=20261126120759';
-import { makeHuman, animateHuman } from './entities.js?v=20261126120759';
-import { labelTexture } from './textures.js?v=20261126120759';
-import { pointInPoly } from './util.js?v=20261126120759';
+import { Crowd } from './crowd.js?v=20261126120914';
+import { makeHuman, animateHuman } from './entities.js?v=20261126120914';
+import { labelTexture } from './textures.js?v=20261126120914';
+import { pointInPoly } from './util.js?v=20261126120914';
 
 const AREA = { x0: -462, x1: -42, z0: 988, z1: 1236 }; // obdélník kolem areálu
 const DOORS = [ // vchody, odkud vychází oddíly (plechové dveře se stříškou)
@@ -437,7 +437,9 @@ export class PrisonFX {
       const v = ss.getVoices().find((x) => /^cs/i.test(x.lang));
       if (v) u.voice = v;
       u.lang = 'cs-CZ'; u.rate = 0.95; u.pitch = 0.9; u.volume = 0.9;
-      setTimeout(() => { ss.cancel(); ss.speak(u); }, 1100);
+      if (ss.speaking || ss.pending) ss.cancel(); // (Safari ignoruje speak hned po cancel – proto zrušit předem)
+      if (ss.paused) ss.resume();
+      setTimeout(() => ss.speak(u), 1100);
     } catch { /* bez hlasu */ }
   }
 
