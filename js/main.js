@@ -1,12 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261126120914';
-import { buildWorld } from './world.js?v=20261126120914';
-import { loadModels } from './models.js?v=20261126120914';
-import { Game } from './game.js?v=20261126120914';
-import { Hud } from './hud.js?v=20261126120914';
-import { Input } from './input.js?v=20261126120914';
-import { Audio } from './audio.js?v=20261126120914';
-import { clamp, lerp, nextFrame } from './util.js?v=20261126120914';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261126122307';
+import { buildWorld } from './world.js?v=20261126122307';
+import { loadModels } from './models.js?v=20261126122307';
+import { Game } from './game.js?v=20261126122307';
+import { Hud } from './hud.js?v=20261126122307';
+import { Input } from './input.js?v=20261126122307';
+import { PrisonFX } from './prisonfx.js?v=20261126122307';
+import { Audio } from './audio.js?v=20261126122307';
+import { clamp, lerp, nextFrame } from './util.js?v=20261126122307';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -28,8 +29,10 @@ const tbUp = $('tb-up'), tbDown = $('tb-down');
 // telefony (hlavně iPhone) pustí zvuk a hlášení rozhlasu až po dotyku: při každém dotyku probudíme zvuk,
 // při prvním dotyku odemkneme hlasový výstup tichou větou
 let speechUnlocked = false;
+try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch { /* iPhone: zvuk i při ztlumení */ }
 const unlockSound = () => {
   try { if (audio.ctx && audio.ctx.state !== 'running') audio.ctx.resume(); } catch { /* bez zvuku */ }
+  PrisonFX.unlockVoice();
   if (!speechUnlocked && window.speechSynthesis) {
     speechUnlocked = true;
     try { const u = new SpeechSynthesisUtterance(' '); u.volume = 0; u.lang = 'cs-CZ'; speechSynthesis.speak(u); speechSynthesis.getVoices(); } catch { /* bez hlasu */ }

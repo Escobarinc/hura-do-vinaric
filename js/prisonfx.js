@@ -10,10 +10,10 @@
  * Souřadnice světa: x = východ, z = jih.
  */
 import * as THREE from 'three';
-import { Crowd } from './crowd.js?v=20261126120914';
-import { makeHuman, animateHuman } from './entities.js?v=20261126120914';
-import { labelTexture } from './textures.js?v=20261126120914';
-import { pointInPoly } from './util.js?v=20261126120914';
+import { Crowd } from './crowd.js?v=20261126122307';
+import { makeHuman, animateHuman } from './entities.js?v=20261126122307';
+import { labelTexture } from './textures.js?v=20261126122307';
+import { pointInPoly } from './util.js?v=20261126122307';
 
 const AREA = { x0: -462, x1: -42, z0: 988, z1: 1236 }; // obdélník kolem areálu
 const DOORS = [ // vchody, odkud vychází oddíly (plechové dveře se stříškou)
@@ -427,9 +427,26 @@ export class PrisonFX {
     a?.blip?.(1450, 0.06, 'square', 0.04); setTimeout(() => a?.noise?.(0.5, 0.06, 2600), 80); setTimeout(() => a?.blip?.(1150, 0.06, 'square', 0.04), 650);
   }
   /** Hlášení z rozhlasu: gong a hlas (česky, pokud je k dispozici). */
+  /**
+   * Hlášení rozhlasu. Nahrané hlasem Zuzana (assets/voice/*.m4a) – přehrává se přes <audio>, takže hraje i na telefonu
+   * (hlasový výstup prohlížeče na mobilech často mlčí). Pro text bez nahrávky se použije hlas prohlížeče.
+   */
   announce(text) {
     const a = this.game.audio;
     a?.blip?.(784, 0.5, 'sine', 0.12); setTimeout(() => a?.blip?.(622, 0.7, 'sine', 0.12), 420);
+    const file = PrisonFX.VOICE[text];
+    const v = PrisonFX.voiceEl();
+    if (file && v) {
+      clearTimeout(this.voiceT);
+      this.voiceT = setTimeout(() => {
+        v.pause(); v.src = `assets/voice/${file}.m4a`; v.currentTime = 0; v.muted = false; v.volume = 1;
+        v.play().catch(() => this.speak(text));
+      }, 1100);
+      return;
+    }
+    this.speak(text);
+  }
+  speak(text) {
     try {
       const ss = window.speechSynthesis;
       if (!ss) return;
@@ -442,6 +459,32 @@ export class PrisonFX {
       setTimeout(() => ss.speak(u), 1100);
     } catch { /* bez hlasu */ }
   }
+  static VOICE = {
+    'Pozor, požár v budově K. Všichni zůstaňte na celách. Přijíždějí hasiči.': 'pozar',
+    'Pozor, vyhlašuji poplach. Všichni odsouzení okamžitě na zem. Zasahuje policie.': 'poplach',
+    'Pozor, přijíždí eskorta. Uvolněte vjezd.': 'eskorta',
+    'Pozor, pozor. Nástup na oběd. Oddíly se připraví k odchodu do jídelny.': 'obed',
+    'Pozor, pozor. Nástup na večeři. Oddíly se připraví k odchodu do jídelny.': 'vecere',
+  };
+  /** Jeden sdílený přehrávač; na telefonu se musí odemknout dotykem (unlockVoice). */
+  static voiceEl() {
+    if (!PrisonFX._v && typeof Audio !== 'undefined') {
+      const v = document.createElement('audio');
+      v.preload = 'auto'; v.setAttribute('playsinline', '');
+      PrisonFX._v = v;
+    }
+    return PrisonFX._v;
+  }
+  /** Volá se při dotyku: přehraje nahrávku potichu a zastaví ji – od té chvíle smí přehrávač hrát i bez dotyku. */
+  static unlockVoice() {
+    const v = PrisonFX.voiceEl();
+    if (!v || PrisonFX._unlocked) return;
+    PrisonFX._unlocked = true;
+    v.src = 'assets/voice/eskorta.m4a'; v.muted = true;
+    const p = v.play();
+    if (p) p.then(() => { v.pause(); v.currentTime = 0; v.muted = false; }).catch(() => { PrisonFX._unlocked = false; v.muted = false; });
+  }
+
 
   /* ---------------- mokro po hašení ---------------- */
   wetGround(b) {
