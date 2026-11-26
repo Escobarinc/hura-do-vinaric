@@ -1,12 +1,12 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261126120455';
-import { buildWorld } from './world.js?v=20261126120455';
-import { loadModels } from './models.js?v=20261126120455';
-import { Game } from './game.js?v=20261126120455';
-import { Hud } from './hud.js?v=20261126120455';
-import { Input } from './input.js?v=20261126120455';
-import { Audio } from './audio.js?v=20261126120455';
-import { clamp, lerp, nextFrame } from './util.js?v=20261126120455';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261126120759';
+import { buildWorld } from './world.js?v=20261126120759';
+import { loadModels } from './models.js?v=20261126120759';
+import { Game } from './game.js?v=20261126120759';
+import { Hud } from './hud.js?v=20261126120759';
+import { Input } from './input.js?v=20261126120759';
+import { Audio } from './audio.js?v=20261126120759';
+import { clamp, lerp, nextFrame } from './util.js?v=20261126120759';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -23,6 +23,7 @@ $('btn-play').onclick = start;
 const audio = new Audio();
 
 /** Nápověda s klávesovými zkratkami: Tab, F1, ?, tlačítko vlevo nahoře nebo křížek. */
+const tbUp = $('tb-up'), tbDown = $('tb-down');
 function toggleHelp(show) {
   const el = $('controls');
   el.hidden = show === undefined ? !el.hidden : !show;
@@ -271,6 +272,14 @@ async function run(city, progress) {
     last = now;
     // menu klávesy
     if (input.hit('Tab') || input.hit('F1')) toggleHelp();
+    if (input.touch) {
+      // dotyková tlačítka: popisky podle toho, co právě dělají
+      const air = game.mode === 'heli' || (game.mode === 'foot' && game.jetpack);
+      const st = game.mode === 'car' ? ['🛑', ''] : air ? ['▲', '▼'] : ['⤒', '🏃'];
+      if (tbUp.textContent !== st[0]) tbUp.textContent = st[0];
+      if (tbDown.textContent !== (st[1] || '🏃')) tbDown.textContent = st[1] || '🏃';
+      tbDown.style.visibility = st[1] ? '' : 'hidden';
+    }
     // M: se zbraní v ruce (pěšky) střílí, jinak velká mapa
     const armed = game.mode === 'foot' && game.weapons?.slot > 0;
     if (input.hit('KeyM') && (!armed || hud.bigMapOpen)) { if (hud.bigMapOpen) hud.closeBigMap(); else hud.openBigMap(game); }

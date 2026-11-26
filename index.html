@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Unbounded:wght@700;900&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=20261126120455">
+<link rel="stylesheet" href="css/style.css?v=20261126120759">
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
 </script>
@@ -113,7 +113,9 @@
       <tr><td>Kolečko vlevo dole</td><td>chůze · jízda · let</td></tr>
       <tr><td>Tah prstem po obrazovce</td><td>otáčení kamery</td></tr>
       <tr><td><b class="tbi tb-e">E</b></td><td>nastoupit · vystoupit</td></tr>
-      <tr><td><b class="tbi">⤒</b> <b class="tbi">⇧</b></td><td>skok · brzda · stoupání / sprint · klesání</td></tr>
+      <tr><td><b class="tbi">⤒</b> <b class="tbi">🏃</b></td><td>pěšky: skok / sprint</td></tr>
+      <tr><td><b class="tbi">▲</b> <b class="tbi">▼</b></td><td>vrtulník a jetpack: nahoru / dolů</td></tr>
+      <tr><td><b class="tbi">🛑</b></td><td>v autě: ruční brzda</td></tr>
       <tr><td><b class="tbi">▦</b></td><td>velká mapa</td></tr>
       <tr><td><b class="tbi">🔫</b> <b class="tbi">💥</b></td><td>vybrat zbraň / střelba</td></tr>
       <tr><td>☰ Věznice</td><td>obědy, eskorty, hasiči, policie, restart</td></tr>
@@ -129,8 +131,8 @@
     <div id="joy" class="joy"><i id="joy-knob"></i></div>
     <div class="tbtns">
       <button data-k="KeyE" class="tb tb-e">E</button>
-      <button data-k="Space" class="tb">⤒</button>
-      <button data-k="ShiftLeft" class="tb">⇧</button>
+      <button data-k="Space" class="tb" id="tb-up">⤒</button>
+      <button data-k="ShiftLeft" class="tb" id="tb-down">🏃</button>
       <button data-k="KeyM" class="tb tb-s">▦</button>
       <button data-k="KeyQ" class="tb" aria-label="Zbraň">🔫</button>
       <button data-k="KeyF" class="tb tb-f" aria-label="Střelba">💥</button>
@@ -138,6 +140,6 @@
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=20261126120455"></script>
+<script type="module" src="js/main.js?v=20261126120759"></script>
 </body>
 </html>
