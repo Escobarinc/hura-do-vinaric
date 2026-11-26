@@ -1,0 +1,2 @@
+Ultimate Animated Character Pack by Quaternius (quaternius.com)
+License: CC0 1.0 Universal (public domain). Packed to GLB with tools/pack_chars.py.

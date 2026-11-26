@@ -1,0 +1,295 @@
+import * as THREE from 'three';
+import { City, fetchData, fetchTerrain } from './data.js';
+import { buildWorld } from './world.js';
+import { loadModels } from './models.js';
+import { Game } from './game.js';
+import { Hud } from './hud.js';
+import { Input } from './input.js';
+import { Audio } from './audio.js';
+import { clamp, lerp, nextFrame } from './util.js';
+import { Sky } from 'three/addons/objects/Sky.js';
+import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
+import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
+import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+
+const $ = (id) => document.getElementById(id);
+const mobile = matchMedia('(pointer: coarse)').matches || innerWidth < 700;
+
+$('btn-about').onclick = () => ($('about').hidden = !$('about').hidden);
+$('btn-play').onclick = start;
+
+const audio = new Audio();
+let started = false;
+
+async function start() {
+  if (started) return;
+  started = true;
+  audio.start();
+  $('menu').hidden = true;
+  $('loading').hidden = false;
+  const bar = $('load-bar'), label = $('load-label'), pct = $('load-pct'), sub = $('load-sub');
+  const progress = (p, text, s = '') => {
+    bar.style.width = Math.round(p * 100) + '%';
+    pct.textContent = Math.round(p * 100) + ' %';
+    if (text) label.textContent = text;
+    sub.textContent = s;
+  };
+  try {
+    progress(0, 'Stahuji mapu Vinařic');
+    const terrainP = fetchTerrain('data/terrain.bin');
+    const raw = await fetchData('data/vinarice.json', (p, got) => progress(p * 0.3, 'Stahuji mapu Vinařic', `${(got / 1e6).toFixed(1)} MB · OpenStreetMap`));
+    const terrain = await terrainP;
+    progress(0.31, 'Skládám ulice do sítě');
+    await nextFrame();
+    const city = new City(raw, terrain);
+    await run(city, (p, t) => progress(0.33 + p * 0.65, t, `${city.buildings.length.toLocaleString('cs-CZ')} budov · ${city.roads.length.toLocaleString('cs-CZ')} úseků ulic`));
+  } catch (e) {
+    console.error(e);
+    label.textContent = 'Něco se pokazilo';
+    sub.textContent = String(e.message || e);
+  }
+}
+
+/** Ortofoto ČÚZK složené do 4 dílů (pokud chybí, hra jede bez něj). */
+async function loadOrtho(renderer) {
+  const q = mobile ? 'lo' : 'hi';
+  const loader = new THREE.TextureLoader();
+  try {
+    const ts = await Promise.all(['00', '10', '01', '11'].map((k) => loader.loadAsync(`data/ortho/ortho_${q}_${k}.jpg`)));
+    for (const t of ts) {
+      t.colorSpace = THREE.SRGBColorSpace;
+      t.anisotropy = renderer.capabilities.getMaxAnisotropy();
+      t.wrapS = t.wrapT = THREE.ClampToEdgeWrapping;
+    }
+    return ts;
+  } catch {
+    return null;
+  }
+}
+
+async function run(city, progress) {
+  const canvas = $('game');
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: !mobile, powerPreference: 'high-performance' });
+  renderer.setPixelRatio(Math.min(devicePixelRatio, mobile ? 1.5 : 2));
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.shadowMap.enabled = !mobile;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure = 1.05;
+
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(62, innerWidth / innerHeight, 0.3, 2600);
+  scene.fog = new THREE.Fog('#c8d6e2', 300, 1500);
+
+  const hemi = new THREE.HemisphereLight('#dfeaf5', '#6b6455', 0.9);
+  scene.add(hemi);
+  const sun = new THREE.DirectionalLight('#fff3e0', 2.2);
+  sun.castShadow = true;
+  sun.shadow.mapSize.set(4096, 4096);
+  const sc = sun.shadow.camera;
+  sc.left = sc.bottom = -150; sc.right = sc.top = 150; sc.near = 10; sc.far = 800;
+  sun.shadow.bias = -0.0006;
+  sun.shadow.normalBias = 0.6;
+  scene.add(sun, sun.target);
+
+  // obloha – fyzikální model (Preetham)
+  const sky = new Sky();
+  sky.scale.setScalar(4000);
+  const su = sky.material.uniforms;
+  su.turbidity.value = 4; su.rayleigh.value = 1.4; su.mieCoefficient.value = 0.004; su.mieDirectionalG.value = 0.82;
+  scene.add(sky);
+  // odrazy prostředí (lak aut, sklo)
+  const pmrem = new THREE.PMREMGenerator(renderer);
+  scene.environment = pmrem.fromScene(new RoomEnvironment(), 0.04).texture;
+  scene.environmentIntensity = 0.5;
+
+  // hvězdy
+  const starG = new THREE.BufferGeometry();
+  const sp = [];
+  for (let i = 0; i < 900; i++) {
+    const a = Math.random() * Math.PI * 2, b = Math.random() * Math.PI * 0.45;
+    sp.push(Math.cos(a) * Math.cos(b) * 2200, Math.sin(b) * 2200 + 50, Math.sin(a) * Math.cos(b) * 2200);
+  }
+  starG.setAttribute('position', new THREE.Float32BufferAttribute(sp, 3));
+  const starMat = new THREE.PointsMaterial({ color: '#ffffff', size: 2.2, sizeAttenuation: false, transparent: true, opacity: 0, fog: false });
+  const stars = new THREE.Points(starG, starMat);
+  scene.add(stars);
+
+  // déšť
+  const RN = mobile ? 1500 : 4000;
+  const rainG = new THREE.BufferGeometry();
+  const rp = new Float32Array(RN * 6);
+  for (let i = 0; i < RN; i++) {
+    const x = (Math.random() - 0.5) * 80, y = Math.random() * 40, z = (Math.random() - 0.5) * 80;
+    rp.set([x, y, z, x + 0.05, y - 0.7, z], i * 6);
+  }
+  rainG.setAttribute('position', new THREE.BufferAttribute(rp, 3));
+  const rain = new THREE.LineSegments(rainG, new THREE.LineBasicMaterial({ color: '#aabbcc', transparent: true, opacity: 0.45 }));
+  rain.visible = false;
+  rain.frustumCulled = false;
+  scene.add(rain);
+
+  progress(0.02, 'Načítám letecké snímky ČÚZK, auta a lidi');
+  const [ortho] = await Promise.all([loadOrtho(renderer), loadModels(mobile)]);
+  const world = await buildWorld(city, scene, progress, mobile, ortho);
+  progress(0.88, 'Vypouštím autobusy na linky');
+  await nextFrame();
+  const input = new Input(canvas);
+  const hud = new Hud(city);
+  const game = new Game({ city, world, scene, camera, input, hud, audio, mobile });
+  progress(0.97, 'Světla a stíny');
+  await nextFrame();
+  renderer.compile(scene, camera);
+  // postprocessing: ambientní okluze (jen desktop)
+  let composer = null;
+  if (!mobile) {
+    composer = new EffectComposer(renderer);
+    composer.addPass(new RenderPass(scene, camera));
+    const ao = new GTAOPass(scene, camera, innerWidth, innerHeight);
+    ao.updateGtaoMaterial({ radius: 1.2, distanceExponent: 1.5, thickness: 2, scale: 1.2 });
+    ao.blendIntensity = 0.9;
+    composer.addPass(ao);
+    composer.addPass(new OutputPass());
+  }
+  progress(1, 'Hotovo');
+  await nextFrame();
+
+  $('loading').hidden = true;
+  $('hud').hidden = false;
+  if (input.touch) $('touch').hidden = false;
+  input.enabled = true;
+  hud.toast(input.touch
+    ? 'Vítej na náměstí ve Vinařicích! Vedle stojí sportovní auto, dodávka, policie, hasiči a vrtulník – dojdi k nim a ťukni na E.'
+    : 'Vítej na náměstí ve Vinařicích! Vedle stojí sportovní auto, dodávka, policie, hasiči a vrtulník – dojdi k nim a stiskni E.');
+  game.msgT = 9;
+
+  addEventListener('resize', () => {
+    renderer.setSize(innerWidth, innerHeight);
+    composer?.setSize(innerWidth, innerHeight);
+    camera.aspect = innerWidth / innerHeight;
+    camera.updateProjectionMatrix();
+  });
+
+  // ---------- čas a počasí ----------
+  let hour = 15;
+  const WEATHER = [
+    { n: 'jasno', fog: 1, light: 1, rain: false, cloud: 0 },
+    { n: 'polojasno', fog: 0.85, light: 0.85, rain: false, cloud: 0.3 },
+    { n: 'zataženo', fog: 0.6, light: 0.6, rain: false, cloud: 0.7 },
+    { n: 'déšť', fog: 0.4, light: 0.45, rain: true, cloud: 1 },
+  ];
+  let weather = WEATHER[0], weatherNext = 18 * 60;
+  const dayTop = new THREE.Color('#4f8fd0'), dayBot = new THREE.Color('#d8e6f0');
+  const nightTop = new THREE.Color('#050912'), nightBot = new THREE.Color('#1a2234');
+  const duskBot = new THREE.Color('#f0a46a');
+  const grey = new THREE.Color('#9aa3ab');
+  const tmpA = new THREE.Color(), tmpB = new THREE.Color();
+
+  // zrychlené přetáčení času: 1× → 5× → 20× → 60× → 1×
+  const SPEEDS = [1, 5, 20, 60];
+  function cycleTime() {
+    const i = SPEEDS.indexOf(game.timeFast || 1);
+    game.timeFast = SPEEDS[(i + 1) % SPEEDS.length];
+    game.toast(game.timeFast > 1 ? `⏩ Čas běží ${game.timeFast}× rychleji (P = další rychlost)` : 'Čas běží normálně');
+  }
+  $('clock').addEventListener('click', cycleTime);
+  $('clock').title = 'Přetáčení času (P)';
+
+  function environment(dt) {
+    if (game.setHour != null) { hour = game.setHour; game.setHour = null; game.hourJumped = true; } // přeskok času
+    // 1 herní hodina = 1 minuta; u věznice se při výdeji jídla zpomalí; P = zrychlené přetáčení (pak se zpomalení vypne)
+    const fast = game.timeFast || 1;
+    hour = (hour + (dt / 60) * (fast > 1 ? fast : 1 / (game.timeSlow || 1))) % 24;
+    game.hour = hour;
+    weatherNext -= dt;
+    if (weatherNext <= 0) {
+      const r = Math.random();
+      weather = r < 0.45 ? WEATHER[0] : r < 0.7 ? WEATHER[1] : r < 0.87 ? WEATHER[2] : WEATHER[3];
+      weatherNext = 240 + Math.random() * 300;
+    }
+    const ang = ((hour - 6) / 24) * Math.PI * 2; // 6:00 východ, 18:00 západ
+    const elev = Math.sin(ang);
+    const day = clamp(elev * 3 + 0.25, 0, 1);
+    const dusk = clamp(1 - Math.abs(elev) * 5, 0, 1) * (elev > -0.2 ? 1 : 0);
+    const F = game.focus();
+    const sd = new THREE.Vector3(Math.cos(ang) * 0.8, Math.max(0.08, elev), 0.45).normalize();
+    const fy = F.y || 0;
+    sun.position.set(F.x + sd.x * 300, fy + sd.y * 300, F.z + sd.z * 300);
+    sun.target.position.set(F.x, fy, F.z);
+    sun.intensity = 2.4 * day * weather.light;
+    sun.color.set(dusk > 0.3 ? '#ffc690' : '#fff3e0');
+    hemi.intensity = 0.25 + 0.75 * day * (0.6 + weather.light * 0.4);
+    tmpA.copy(nightTop).lerp(dayTop, day).lerp(grey, weather.cloud * 0.6 * day);
+    tmpB.copy(nightBot).lerp(dayBot, day).lerp(duskBot, dusk * 0.7).lerp(grey, weather.cloud * 0.5 * day);
+    su.sunPosition.value.set(Math.cos(ang) * 0.8, elev, 0.45);
+    su.turbidity.value = 2 + weather.cloud * 10;
+    su.rayleigh.value = 2 + weather.cloud * 1.5;
+    scene.environmentIntensity = 0.12 + 0.45 * day;
+    scene.fog.color.copy(tmpB);
+    renderer.toneMappingExposure = 0.55 + 0.45 * day;
+    scene.fog.near = 200 * weather.fog;
+    scene.fog.far = (mobile ? 1000 : 1500) * weather.fog;
+    sky.position.copy(camera.position);
+    stars.position.copy(sky.position);
+    starMat.opacity = clamp(1 - day * 2, 0, 1) * (1 - weather.cloud);
+    const night = clamp(1 - day * 1.6, 0, 1);
+    world.update(dt, game.time, night);
+    rain.visible = weather.rain;
+    if (rain.visible) {
+      rain.position.set(camera.position.x, camera.position.y - 20, camera.position.z);
+      const a = rainG.attributes.position.array;
+      for (let i = 0; i < a.length; i += 6) {
+        a[i + 1] -= dt * 28; a[i + 4] -= dt * 28;
+        if (a[i + 1] < 0) { a[i + 1] += 40; a[i + 4] += 40; }
+      }
+      rainG.attributes.position.needsUpdate = true;
+    }
+    const hh = Math.floor(hour), mm = Math.floor((hour % 1) * 60);
+    return `${hh}:${String(mm).padStart(2, '0')} · ${weather.n}${fast > 1 ? ` · ⏩ ${fast}×` : ''}`;
+  }
+
+  // ---------- smyčka ----------
+  let last = performance.now();
+  let paused = false;
+  const perf = { t: 0, n: 0 };
+  function frame(now) {
+    requestAnimationFrame(frame);
+    const rawDt = (now - last) / 1000;
+    const dt = Math.min(0.05, rawDt);
+    last = now;
+    // menu klávesy
+    if (input.hit('Tab')) $('controls').hidden = !$('controls').hidden;
+    // M: se zbraní v ruce (pěšky) střílí, jinak velká mapa
+    const armed = game.mode === 'foot' && game.weapons?.slot > 0;
+    if (input.hit('KeyM') && (!armed || hud.bigMapOpen)) { if (hud.bigMapOpen) hud.closeBigMap(); else hud.openBigMap(game); }
+    if (input.hit('KeyT')) { if (hud.teleportOpen) hud.closeTeleport(); else hud.openTeleport(game); }
+    if (input.hit('KeyN')) { if (hud.teleportOpen) hud.closeTeleport(); else hud.openNav(game); }
+    if (input.hit('KeyR')) game.restart();
+    if (input.hit('KeyP')) cycleTime();
+    if (input.hit('KeyJ')) game.toggleJetpack();
+    if (input.hit('Escape')) { hud.closeBigMap(); hud.closeTeleport(); $('controls').hidden = true; }
+    paused = hud.bigMapOpen || hud.teleportOpen;
+    if (!paused) {
+      game.update(dt);
+      game.updateGps(dt);
+    }
+    const clock = environment(paused ? 0 : dt);
+    hud.update(game, dt, clock);
+    input.endFrame();
+    // automatická kvalita: když hra trhá, vypne se okluze a zmenší stíny
+    if (!document.hidden && rawDt > 0 && rawDt < 0.25) {
+      perf.t += rawDt; perf.n++;
+      if (perf.t > 4) {
+        const fps = perf.n / perf.t;
+        if (fps < 40 && composer) { composer = null; }
+        else if (fps < 40 && sun.shadow.mapSize.x > 2048) { sun.shadow.mapSize.set(2048, 2048); sun.shadow.map?.dispose(); sun.shadow.map = null; }
+        perf.t = 0; perf.n = 0;
+      }
+    }
+    if (composer) composer.render(dt); else renderer.render(scene, camera);
+  }
+  requestAnimationFrame(frame);
+  window.__game = game; // ladění
+}

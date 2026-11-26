@@ -1,0 +1,112 @@
+<!doctype html>
+<html lang="cs">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
+<title>Hurá do Vinařic – skutečné Vinařice u Kladna jako otevřený svět</title>
+<meta name="description" content="Projeď se skutečnými Vinařicemi u Kladna. Ulice, domy, důl Mayrau, Vinařická hora i autobusy PID podle otevřených dat. Zdarma v prohlížeči.">
+<meta name="theme-color" content="#14110f">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
+</script>
+</head>
+<body>
+<canvas id="game"></canvas>
+<div id="beta-badge" style="position:fixed;right:10px;bottom:10px;z-index:99;pointer-events:none;font:800 12px system-ui,sans-serif;letter-spacing:.08em;color:#fff;background:#c8452c;padding:4px 9px;border-radius:7px;opacity:.85">BETA</div>
+
+<!-- ÚVODNÍ OBRAZOVKA -->
+<section id="menu" class="screen">
+  <div class="menu-card">
+    <h1 class="logo"><span>Hurá do
+</span><b>Vinařic</b></h1>
+    <p class="claim">Skutečné Vinařice u Kladna jako otevřený svět</p>
+    <p class="lead">Ulice, domy, těžní věž dolu Mayrau, Vinařická hora i autobusy PID podle skutečných dat. Ukradni auto, svez se autobusem po jeho lince, vzlétni vrtulníkem záchranky nad haldami a ujížděj policii přes Švermov a Hnidousy – ať neskončíš ve vinařické věznici.</p>
+    <div class="menu-actions">
+      <button id="btn-play" class="btn btn-primary">Hrát</button>
+      <button id="btn-about" class="btn btn-ghost">O hře</button>
+    </div>
+    <div id="about" class="about" hidden>
+      <h2>O hře</h2>
+      <p>Mapa vznikla z otevřených dat: půdorysy a výšky budov z OpenStreetMap (výšky převážně z RÚIAN/ČÚZK), ulice, potoky, zeleň, zastávky a trasy autobusových linek PID. Terén z ČÚZK DMR 5G (mřížka 2 m), ortofoto ČÚZK (~0,4 m/px). Herní svět pokrývá zhruba 3,2 × 3,2 km kolem vinařického náměstí.</p>
+      <p>Ovládání: <kbd>W A S D</kbd> pohyb · <kbd>Shift</kbd> sprint · <kbd>Mezerník</kbd> skok / ruční brzda · <kbd>E</kbd> nastoupit / vystoupit · <kbd>M</kbd> velká mapa · myš otáčí kamerou.</p>
+    </div>
+    <p class="credits">© přispěvatelé OpenStreetMap (ODbL) · ortofoto a výšky budov © ČÚZK · auta Kenney, postavy Quaternius (CC0)</p>
+  </div>
+</section>
+
+<!-- NAČÍTÁNÍ -->
+<section id="loading" class="screen" hidden>
+  <div class="load-card">
+    <h1 class="logo small"><span>Hurá do
+</span><b>Vinařic</b></h1>
+    <div class="bar"><i id="load-bar"></i></div>
+    <div class="load-row"><strong id="load-label">Připravuji mapu</strong><strong id="load-pct">0 %</strong></div>
+    <div id="load-sub" class="load-sub"></div>
+  </div>
+</section>
+
+<!-- HUD -->
+<div id="hud" hidden>
+  <div class="hud-top">
+    <div id="wanted" class="wanted" aria-label="Hledanost"></div>
+    <div class="money"><i>Kč</i><span id="money">0</span></div>
+    <div id="clock" class="clock">15:00 · jasno</div>
+  </div>
+
+  <div id="mission" class="mission" hidden></div>
+  <div id="toast" class="toast" hidden></div>
+  <div id="hint" class="hint" hidden></div>
+  <div id="big-msg" class="big-msg" hidden></div>
+
+  <div class="hud-left">
+    <div class="help-tag"><kbd>Tab</kbd> ovládání</div>
+    <div class="loc">
+      <div id="loc-icon" class="loc-icon">⌂</div>
+      <div><strong id="loc-name">Velké náměstí</strong><small id="loc-sub">Historické jádro</small></div>
+    </div>
+    <canvas id="minimap" width="240" height="160"></canvas>
+    <div class="health"><b>+</b><div class="hbar"><i id="hp-bar"></i></div><span id="hp">100</span></div>
+  </div>
+
+  <div id="speedo" class="speedo" hidden><b id="speed">0</b><small>km/h</small><div class="dmg"><i id="dmg-bar"></i></div></div>
+
+  <div id="keys" class="keys"></div>
+
+  <div id="controls" class="controls-panel" hidden>
+    <h3>Ovládání</h3>
+    <table>
+      <tr><td><kbd>W A S D</kbd></td><td>chůze / jízda</td></tr>
+      <tr><td><kbd>Shift</kbd></td><td>sprint · ve vrtulníku klesání</td></tr>
+      <tr><td><kbd>Mezerník</kbd></td><td>skok · ruční brzda · stoupání</td></tr>
+      <tr><td><kbd>E</kbd></td><td>nastoupit / vystoupit / ukrást auto</td></tr>
+      <tr><td><kbd>H</kbd></td><td>houkačka</td></tr>
+      <tr><td><kbd>C</kbd></td><td>pohled kamery</td></tr>
+      <tr><td><kbd>M</kbd></td><td>velká mapa</td></tr>
+      <tr><td><kbd>T</kbd></td><td>teleport na zajímavá místa</td></tr>
+      <tr><td><kbd>R</kbd></td><td>restart u morového sloupu</td></tr>
+      <tr><td>Myš</td><td>otáčení kamery (klikni do hry)</td></tr>
+    </table>
+  </div>
+
+  <div id="bigmap" class="bigmap" hidden><canvas id="bigmap-canvas"></canvas><p>Klikni na mapu pro nastavení cíle · <kbd>M</kbd> zavřít</p></div>
+  <div id="teleport" class="teleport" hidden></div>
+
+  <!-- dotykové ovládání -->
+  <div id="touch" class="touch" hidden>
+    <div id="joy" class="joy"><i id="joy-knob"></i></div>
+    <div class="tbtns">
+      <button data-k="KeyE" class="tb tb-e">E</button>
+      <button data-k="Space" class="tb">⤒</button>
+      <button data-k="ShiftLeft" class="tb">⇧</button>
+      <button data-k="KeyM" class="tb tb-s">▦</button>
+    </div>
+  </div>
+</div>
+
+<script type="module" src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,6 @@
+node_modules/
+assets/_src/
+podklady/
+tools/_osm/
+.DS_Store
+__pycache__/
