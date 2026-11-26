@@ -1,6 +1,6 @@
 import * as THREE from 'three';
-import { hash01, pointInPoly, nextFrame } from './util.js';
-import * as TX from './textures.js';
+import { hash01, pointInPoly, nextFrame } from './util.js?v=20261126120455';
+import * as TX from './textures.js?v=20261126120455';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* --------- pomocný buffer geometrie --------- */
