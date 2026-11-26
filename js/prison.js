@@ -1238,6 +1238,8 @@ export class PrisonLife {
     add('🚒 Hasičský zásah', () => { this.goToPrison(); this.startFire(); });
     add('🚨 Policejní zásah', () => this.startRiot());
     add('🔄 Restart', () => this.resetAll());
+    add('📍 Teleport (T)', () => this.game.hud.openTeleport(this.game));
+    add('🧭 Navigace (N)', () => this.game.hud.openNav(this.game));
     add('🚀 Jetpack (J)', () => this.game.toggleJetpack());
     add(matchMedia('(pointer: coarse)').matches ? '❔ Ovládání' : '⌨️ Klávesy', () => { const c = document.getElementById('controls'); c.hidden = !c.hidden; if (!c.hidden && document.pointerLockElement) document.exitPointerLock(); });
     add('🔕 Vypnout sirénu', () => this.sirenOn(false));

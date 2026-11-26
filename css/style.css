@@ -95,7 +95,7 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .big-msg { position: absolute; inset: 0; display: grid; place-items: center; font-size: clamp(40px, 10vw, 88px); font-weight: 800; letter-spacing: -.03em; color: var(--brick-hi); text-shadow: 0 5px 0 #4a140a, 0 0 40px rgba(0,0,0,.6); background: radial-gradient(closest-side, rgba(0,0,0,.35), transparent); text-align: center; }
 .big-msg small { display: block; font-size: 18px; color: var(--ink); letter-spacing: 0; text-shadow: 0 1px 4px #000; }
 
-.controls-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; pointer-events: auto; background: rgba(14,18,23,.95); border: 1px solid var(--line); border-top: 3px solid var(--brick); border-radius: 16px; padding: 18px 24px; font-size: 14px; width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
+.controls-panel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 45; pointer-events: auto !important; background: rgba(14,18,23,.95); border: 1px solid var(--line); border-top: 3px solid var(--brick); border-radius: 16px; padding: 18px 24px; font-size: 14px; width: min(760px, calc(100vw - 32px)); max-height: calc(100vh - 32px); overflow: auto; }
 .controls-panel h3 { font-family: "Unbounded", var(--font); font-size: 18px; }
 .ctl-cols { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 0 24px; }
 .controls-panel th { text-align: left; color: var(--brick-hi); font-size: 11px; text-transform: uppercase; letter-spacing: .08em; padding: 12px 0 4px; }
@@ -105,10 +105,11 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .controls-panel td { padding: 4px 10px 4px 0; color: var(--muted); }
 .controls-panel td:first-child { color: var(--ink); }
 
-.bigmap { position: absolute; inset: 0; background: rgba(8,11,14,.86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; pointer-events: auto !important; }
+.bigmap { position: absolute; z-index: 50; inset: 0; background: rgba(8,11,14,.86); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; pointer-events: auto !important; }
 .bigmap canvas { width: min(92vw, 82vh); height: min(92vw, 82vh); border-radius: 14px; border: 1px solid var(--line); cursor: crosshair; }
 .bigmap p { margin: 0; font-size: 13px; color: var(--muted); }
-.teleport { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(14,18,23,.94); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; pointer-events: auto !important; width: min(520px, 92vw); max-height: 80vh; overflow: auto; }
+.teleport { position: absolute; z-index: 50; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(14,18,23,.94); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; pointer-events: auto !important; width: min(520px, 92vw); max-height: 80vh; overflow: auto; }
+.teleport .tp-x { grid-column: 1 / -1; text-align: center; background: rgba(255,106,26,.85); }
 .teleport h3 { grid-column: 1 / -1; margin: 4px 6px 6px; }
 .teleport button { font: 700 14px var(--font); text-align: left; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; cursor: pointer; }
 .teleport button:hover { background: rgba(255,106,26,.35); }
