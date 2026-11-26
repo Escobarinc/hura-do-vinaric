@@ -1212,6 +1212,8 @@ export class PrisonLife {
     css.textContent = `#prison-btns{position:absolute;left:16px;top:max(14px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;gap:6px;max-width:min(560px,70vw);pointer-events:auto;z-index:25}
 #prison-btns button{font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px;cursor:pointer}
 #prison-btns button:hover{background:rgba(255,106,26,.55)}
+#prison-btns .pb-toggle{display:none;background:rgba(255,106,26,.85)}
+@media (pointer: coarse),(max-width:700px){#prison-btns{flex-direction:column;align-items:flex-start;max-width:60vw;left:max(10px,env(safe-area-inset-left))}#prison-btns .pb-toggle{display:block}#prison-btns:not(.open) button:not(.pb-toggle){display:none}#prison-btns button{font-size:14px;padding:9px 13px}#prison-btns .pb-toggle{font-size:13px;padding:8px 10px}#meal-pick{top:60px;left:10px}}
 .mission{top:max(60px,calc(env(safe-area-inset-top) + 48px)) !important}
 #meal-pick{position:absolute;left:16px;top:96px;z-index:40;pointer-events:auto;background:rgba(14,18,23,.94);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;font:600 14px "Manrope",sans-serif;color:#eef2f5;width:min(330px,86vw)}
 #meal-pick h3{margin:0 0 8px;font-size:16px}
@@ -1224,7 +1226,12 @@ export class PrisonLife {
     document.head.appendChild(css);
     const box = document.createElement('div');
     box.id = 'prison-btns';
-    const add = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.addEventListener('click', (e) => { e.stopPropagation(); fn(); b.blur(); }); box.appendChild(b); };
+    const small = () => matchMedia('(pointer: coarse), (max-width: 700px)').matches;
+    const add = (label, fn) => { const b = document.createElement('button'); b.textContent = label; b.addEventListener('click', (e) => { e.stopPropagation(); fn(); b.blur(); if (small()) box.classList.remove('open'); }); box.appendChild(b); };
+    const tg = document.createElement('button');
+    tg.className = 'pb-toggle'; tg.textContent = '☰ Věznice';
+    tg.addEventListener('click', (e) => { e.stopPropagation(); box.classList.toggle('open'); tg.textContent = box.classList.contains('open') ? '✕ Zavřít' : '☰ Věznice'; tg.blur(); });
+    box.appendChild(tg);
     add('🍲 Spustit obědy', () => this.startMeal(0));
     add('🌙 Spustit večeře', () => this.startMeal(1));
     add('🚌 Eskortní autobusy', () => { this.goToPrison(); this.startEscort(2, 35); this.game.prisonFx?.announce('Pozor, přijíždí eskorta. Uvolněte vjezd.'); });
@@ -1232,7 +1239,7 @@ export class PrisonLife {
     add('🚨 Policejní zásah', () => this.startRiot());
     add('🔄 Restart', () => this.resetAll());
     add('🚀 Jetpack (J)', () => this.game.toggleJetpack());
-    add('⌨️ Klávesy', () => { const c = document.getElementById('controls'); c.hidden = !c.hidden; if (!c.hidden && document.pointerLockElement) document.exitPointerLock(); });
+    add(matchMedia('(pointer: coarse)').matches ? '❔ Ovládání' : '⌨️ Klávesy', () => { const c = document.getElementById('controls'); c.hidden = !c.hidden; if (!c.hidden && document.pointerLockElement) document.exitPointerLock(); });
     add('🔕 Vypnout sirénu', () => this.sirenOn(false));
     this.sirenBtn = box.lastChild;
     this.sirenBtn.style.display = 'none';
