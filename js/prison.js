@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261126122307';
-import { labelTexture } from './textures.js?v=20261126122307';
-import { Crowd } from './crowd.js?v=20261126122307';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261126122659';
+import { labelTexture } from './textures.js?v=20261126122659';
+import { Crowd } from './crowd.js?v=20261126122659';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -572,6 +572,7 @@ export class PrisonLife {
   updateConvoy(dt) {
     const F = this.game.focus() || this.game.player;
     for (const c of [...this.convoy]) {
+      if (c.v.dead) { c.v.vx = c.v.vz = 0; continue; } // zničený vrak zůstane stát
       if (c.stage === 'wait') { c.delay -= dt; if (c.delay <= 0) { c.stage = 'in'; c.v.mesh.visible = true; } continue; }
       if (c.stage === 'park') {
         c.v.vx = c.v.vz = 0;

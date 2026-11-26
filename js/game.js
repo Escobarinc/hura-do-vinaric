@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261126122307';
-import { PrisonLife } from './prison.js?v=20261126122307';
-import { Weapons } from './weapons.js?v=20261126122307';
-import { PrisonFX } from './prisonfx.js?v=20261126122307';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeHuman, animateHuman, steerTo } from './entities.js?v=20261126122307';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261126122659';
+import { PrisonLife } from './prison.js?v=20261126122659';
+import { Weapons } from './weapons.js?v=20261126122659';
+import { PrisonFX } from './prisonfx.js?v=20261126122659';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeHuman, animateHuman, steerTo } from './entities.js?v=20261126122659';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -584,6 +584,7 @@ export class Game {
     const v = this.vehicle, inp = this.input;
     const a = inp.axes();
     v.drive(dt, { throttle: a.y, steer: -a.x, hand: inp.down('Space') }, this.city);
+    this.weapons?.runOver(v);
     if (v.lastImpact > 6) this.audio.crash(v.lastImpact);
     if (v.dead && v.sink > 2.4) {
       this.toast('Auto skončilo v řece!');
