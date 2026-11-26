@@ -958,7 +958,7 @@ export class Game {
       this.scene.add(this.beam);
     }
     this.beam.visible = true;
-    this.beam.material.color.set(m.stage === 'pickup' ? '#5cc27a' : '#f2b544');
+    this.beam.material.color.set(m.stage === 'pickup' ? '#5cc27a' : '#ffd23f');
     this.beam.position.set(m.x, this.city.ground(m.x, m.z) + 30, m.z);
     if (m.stage === 'pickup') {
       this.hud.mission(`<b>Taxi: vyzvedni zákazníka</b><small>${Math.round(d)} m · ${this.city.placeName(m.x, m.z).street || ''}</small>`);

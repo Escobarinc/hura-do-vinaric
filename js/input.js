@@ -12,7 +12,7 @@ export class Input {
       if (e.repeat) { if (['Tab', 'Space'].includes(e.code)) e.preventDefault(); return; }
       this.keys.add(e.code);
       this.pressed.add(e.code);
-      if (['Tab', 'Space', 'ArrowUp', 'ArrowDown'].includes(e.code)) e.preventDefault();
+      if (['Tab', 'Space', 'ArrowUp', 'ArrowDown', 'F1'].includes(e.code)) e.preventDefault();
     });
     addEventListener('keyup', (e) => this.keys.delete(e.code));
     addEventListener('blur', () => this.keys.clear());

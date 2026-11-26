@@ -21,6 +21,16 @@ $('btn-about').onclick = () => ($('about').hidden = !$('about').hidden);
 $('btn-play').onclick = start;
 
 const audio = new Audio();
+
+/** Nápověda s klávesovými zkratkami: Tab, F1, ?, tlačítko vlevo nahoře nebo křížek. */
+function toggleHelp(show) {
+  const el = $('controls');
+  el.hidden = show === undefined ? !el.hidden : !show;
+  if (!el.hidden && document.pointerLockElement) document.exitPointerLock();
+}
+$('help-btn')?.addEventListener('click', (e) => { e.stopPropagation(); toggleHelp(); e.currentTarget.blur(); });
+$('controls')?.addEventListener('click', (e) => { e.stopPropagation(); if (e.target.closest('[data-close]')) toggleHelp(false); });
+addEventListener('keydown', (e) => { if (e.key === '?') toggleHelp(); if (e.code === 'F1') e.preventDefault(); });
 let started = false;
 
 async function start() {
@@ -260,7 +270,7 @@ async function run(city, progress) {
     const dt = Math.min(0.05, rawDt);
     last = now;
     // menu klávesy
-    if (input.hit('Tab')) $('controls').hidden = !$('controls').hidden;
+    if (input.hit('Tab') || input.hit('F1')) toggleHelp();
     // M: se zbraní v ruce (pěšky) střílí, jinak velká mapa
     const armed = game.mode === 'foot' && game.weapons?.slot > 0;
     if (input.hit('KeyM') && (!armed || hud.bigMapOpen)) { if (hud.bigMapOpen) hud.closeBigMap(); else hud.openBigMap(game); }

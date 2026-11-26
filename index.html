@@ -5,10 +5,10 @@
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no,viewport-fit=cover">
 <title>Hurá do Vinařic – skutečné Vinařice u Kladna jako otevřený svět</title>
 <meta name="description" content="Projeď se skutečnými Vinařicemi u Kladna. Ulice, domy, důl Mayrau, Vinařická hora i autobusy PID podle otevřených dat. Zdarma v prohlížeči.">
-<meta name="theme-color" content="#14110f">
+<meta name="theme-color" content="#0d1116">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&display=swap" rel="stylesheet">
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&family=Unbounded:wght@700;900&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css">
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
@@ -16,7 +16,7 @@
 </head>
 <body>
 <canvas id="game"></canvas>
-<div id="beta-badge" style="position:fixed;right:10px;bottom:10px;z-index:99;pointer-events:none;font:800 12px system-ui,sans-serif;letter-spacing:.08em;color:#fff;background:#c8452c;padding:4px 9px;border-radius:7px;opacity:.85">BETA</div>
+<div id="beta-badge" style="position:fixed;right:10px;bottom:10px;z-index:99;pointer-events:none;font:800 12px system-ui,sans-serif;letter-spacing:.08em;color:#fff;background:#ff6a1a;padding:4px 9px;border-radius:7px;opacity:.85">BETA</div>
 
 <!-- ÚVODNÍ OBRAZOVKA -->
 <section id="menu" class="screen">
@@ -63,7 +63,7 @@
   <div id="big-msg" class="big-msg" hidden></div>
 
   <div class="hud-left">
-    <div class="help-tag"><kbd>Tab</kbd> ovládání</div>
+    <button class="help-tag" id="help-btn" type="button">⌨️ Klávesy <kbd>Tab</kbd></button>
     <div class="loc">
       <div id="loc-icon" class="loc-icon">⌂</div>
       <div><strong id="loc-name">Velké náměstí</strong><small id="loc-sub">Historické jádro</small></div>
@@ -77,19 +77,38 @@
   <div id="keys" class="keys"></div>
 
   <div id="controls" class="controls-panel" hidden>
-    <h3>Ovládání</h3>
+    <button class="ctl-x" data-close aria-label="Zavřít">✕</button>
+    <h3>⌨️ Klávesové zkratky</h3>
+    <div class="ctl-cols">
     <table>
-      <tr><td><kbd>W A S D</kbd></td><td>chůze / jízda</td></tr>
-      <tr><td><kbd>Shift</kbd></td><td>sprint · ve vrtulníku klesání</td></tr>
+      <tr><th colspan="2">Pohyb</th></tr>
+      <tr><td><kbd>W A S D</kbd> / šipky</td><td>chůze · jízda · let</td></tr>
+      <tr><td><kbd>Shift</kbd></td><td>sprint · ve vzduchu dolů</td></tr>
       <tr><td><kbd>Mezerník</kbd></td><td>skok · ruční brzda · stoupání</td></tr>
-      <tr><td><kbd>E</kbd></td><td>nastoupit / vystoupit / ukrást auto</td></tr>
-      <tr><td><kbd>H</kbd></td><td>houkačka</td></tr>
-      <tr><td><kbd>C</kbd></td><td>pohled kamery</td></tr>
-      <tr><td><kbd>M</kbd></td><td>velká mapa</td></tr>
-      <tr><td><kbd>T</kbd></td><td>teleport na zajímavá místa</td></tr>
-      <tr><td><kbd>R</kbd></td><td>restart u morového sloupu</td></tr>
+      <tr><td><kbd>X</kbd> / <kbd>Ctrl</kbd></td><td>klesání (jetpack)</td></tr>
+      <tr><td><kbd>J</kbd></td><td>jetpack zap / vyp</td></tr>
       <tr><td>Myš</td><td>otáčení kamery (klikni do hry)</td></tr>
+      <tr><td><kbd>C</kbd></td><td>blízká / vzdálená kamera</td></tr>
+      <tr><th colspan="2">Vozidla</th></tr>
+      <tr><td><kbd>E</kbd></td><td>nastoupit · vystoupit · ukrást auto</td></tr>
+      <tr><td><kbd>H</kbd></td><td>houkačka</td></tr>
     </table>
+    <table>
+      <tr><th colspan="2">Zbraně</th></tr>
+      <tr><td><kbd>1</kbd>–<kbd>4</kbd></td><td>pistole · brokovnice · samopal · granát</td></tr>
+      <tr><td><kbd>0</kbd></td><td>schovat zbraň</td></tr>
+      <tr><td>Levé tlačítko</td><td>střelba / hod granátu</td></tr>
+      <tr><th colspan="2">Mapa a svět</th></tr>
+      <tr><td><kbd>M</kbd></td><td>velká mapa (klikem nastavíš cíl)</td></tr>
+      <tr><td><kbd>N</kbd></td><td>navigace</td></tr>
+      <tr><td><kbd>T</kbd></td><td>teleport na zajímavá místa</td></tr>
+      <tr><td><kbd>P</kbd></td><td>denní doba</td></tr>
+      <tr><td><kbd>R</kbd></td><td>restart</td></tr>
+      <tr><td><kbd>Tab</kbd> / <kbd>F1</kbd></td><td>tahle nápověda</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>zavřít okna</td></tr>
+    </table>
+    </div>
+    <p class="ctl-note">Věznice: tlačítka vlevo nahoře spouští obědy, večeře, eskortu, hasiče a policejní zásah.</p>
   </div>
 
   <div id="bigmap" class="bigmap" hidden><canvas id="bigmap-canvas"></canvas><p>Klikni na mapu pro nastavení cíle · <kbd>M</kbd> zavřít</p></div>

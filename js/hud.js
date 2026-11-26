@@ -179,8 +179,8 @@ export class Hud {
     g.save();
     g.translate(W / 2, Hh * 0.6);
     g.rotate(game.camYaw + Math.PI);
-    g.fillStyle = '#f2b544';
-    g.font = '800 11px "Bricolage Grotesque", sans-serif';
+    g.fillStyle = '#ffd23f';
+    g.font = '800 11px "Manrope", sans-serif';
     g.textAlign = 'center';
     const R = Math.min(W, Hh) * 0.5 - 8;
     g.translate(0, -R);
@@ -202,12 +202,12 @@ export class Hud {
     const P = game.focus();
     const mark = (x, z, col, r, label) => {
       g.fillStyle = col; g.beginPath(); g.arc((x + H) * k, (z + H) * k, r, 0, 7); g.fill();
-      if (label) { g.fillStyle = '#f6efe6'; g.font = `700 ${Math.round(size / 75)}px "Bricolage Grotesque", sans-serif`; g.fillText(label, (x + H) * k + r + 3, (z + H) * k + 4); }
+      if (label) { g.fillStyle = '#eef2f5'; g.font = `700 ${Math.round(size / 75)}px "Manrope", sans-serif`; g.fillText(label, (x + H) * k + r + 3, (z + H) * k + 4); }
     };
-    for (const l of game.landmarks) mark(l.x, l.z, '#f2b544', size / 260, l.label);
+    for (const l of game.landmarks) mark(l.x, l.z, '#ffd23f', size / 260, l.label);
     if (game.waypoint) mark(game.waypoint.x, game.waypoint.z, '#b98cff', size / 120);
     mark(P.x, P.z, '#ffffff', size / 110);
-    mark(P.x, P.z, '#c8452c', size / 200);
+    mark(P.x, P.z, '#ff6a1a', size / 200);
     c.onclick = (ev) => {
       const r = c.getBoundingClientRect();
       const x = ((ev.clientX - r.left) / r.width) * H * 2 - H;
@@ -222,7 +222,7 @@ export class Hud {
 
   openTeleport(game) {
     const t = this.el.teleport;
-    t.innerHTML = '<h3>Kam chceš? <small style="color:#b8ab9c;font-weight:600">(T zavřít)</small></h3>';
+    t.innerHTML = '<h3>Kam chceš? <small style="color:#9aa8b6;font-weight:600">(T zavřít)</small></h3>';
     for (const l of game.landmarks) {
       const b = document.createElement('button');
       b.textContent = l.label;
@@ -235,7 +235,7 @@ export class Hud {
   /** N = navigace: seznam cílů (trasa po silnicích). */
   openNav(game) {
     const t = this.el.teleport;
-    t.innerHTML = '<h3>Navigace – kam jedeme? <small style="color:#b8ab9c;font-weight:600">(N zavřít · na mapě M klikni kamkoli)</small></h3>';
+    t.innerHTML = '<h3>Navigace – kam jedeme? <small style="color:#9aa8b6;font-weight:600">(N zavřít · na mapě M klikni kamkoli)</small></h3>';
     if (game.waypoint) {
       const c = document.createElement('button');
       c.textContent = '✕ Zrušit navigaci';

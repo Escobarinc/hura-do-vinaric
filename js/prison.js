@@ -1210,17 +1210,17 @@ export class PrisonLife {
   makeButtons() {
     const css = document.createElement('style');
     css.textContent = `#prison-btns{position:absolute;left:16px;top:max(14px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;gap:6px;max-width:min(560px,70vw);pointer-events:auto;z-index:25}
-#prison-btns button{font:700 13px "Bricolage Grotesque",sans-serif;color:#f6efe6;background:rgba(20,17,15,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px;cursor:pointer}
-#prison-btns button:hover{background:rgba(200,69,44,.55)}
+#prison-btns button{font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px;cursor:pointer}
+#prison-btns button:hover{background:rgba(255,106,26,.55)}
 .mission{top:max(60px,calc(env(safe-area-inset-top) + 48px)) !important}
-#meal-pick{position:absolute;left:16px;top:96px;z-index:40;pointer-events:auto;background:rgba(20,17,15,.94);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;font:600 14px "Bricolage Grotesque",sans-serif;color:#f6efe6;width:min(330px,86vw)}
+#meal-pick{position:absolute;left:16px;top:96px;z-index:40;pointer-events:auto;background:rgba(14,18,23,.94);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;font:600 14px "Manrope",sans-serif;color:#eef2f5;width:min(330px,86vw)}
 #meal-pick h3{margin:0 0 8px;font-size:16px}
 #meal-pick label{display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer}
 #meal-pick label span{opacity:.6;font-weight:600;margin-left:auto;font-size:12.5px}
-#meal-pick input{width:18px;height:18px;accent-color:#c8452c}
+#meal-pick input{width:18px;height:18px;accent-color:#ff6a1a}
 #meal-pick .row{display:flex;gap:6px;margin-top:10px}
-#meal-pick .row button{font:700 13px "Bricolage Grotesque",sans-serif;color:#f6efe6;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:7px 10px;cursor:pointer}
-#meal-pick .row .go{background:#c8452c;flex:1}`;
+#meal-pick .row button{font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:7px 10px;cursor:pointer}
+#meal-pick .row .go{background:#ff6a1a;flex:1}`;
     document.head.appendChild(css);
     const box = document.createElement('div');
     box.id = 'prison-btns';
@@ -1232,6 +1232,7 @@ export class PrisonLife {
     add('🚨 Policejní zásah', () => this.startRiot());
     add('🔄 Restart', () => this.resetAll());
     add('🚀 Jetpack (J)', () => this.game.toggleJetpack());
+    add('⌨️ Klávesy', () => { const c = document.getElementById('controls'); c.hidden = !c.hidden; if (!c.hidden && document.pointerLockElement) document.exitPointerLock(); });
     add('🔕 Vypnout sirénu', () => this.sirenOn(false));
     this.sirenBtn = box.lastChild;
     this.sirenBtn.style.display = 'none';

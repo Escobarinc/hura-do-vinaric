@@ -389,7 +389,7 @@ export function labelTexture(text, bg = '#1f4f9a', fg = '#fff', w = 512, h = 128
   g.fillStyle = bg;
   g.fillRect(0, 0, w, h);
   g.fillStyle = fg;
-  g.font = `800 ${Math.round(h * 0.52)}px "Bricolage Grotesque", system-ui, sans-serif`;
+  g.font = `800 ${Math.round(h * 0.52)}px "Manrope", system-ui, sans-serif`;
   g.textAlign = 'center';
   g.textBaseline = 'middle';
   g.fillText(text, w / 2, h / 2 + 2);
