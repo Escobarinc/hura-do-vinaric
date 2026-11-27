@@ -133,14 +133,21 @@ export class Crowd {
       im.setMatrixAt(i, _m);
     };
     const sw = mode === 'lie' ? 0 : Math.sin(ph) * Math.min(0.75, speed * 0.32);
+    const hip = mode === 'hiphop';
+    const hb = hip ? ((this.beatF || 0) + this.phase[i] * 0.015) : 0, hbf = hb % 1, pump = hip ? Math.pow(1 - hbf, 2.5) : 0;
     put(P.torso, 0, 1.22, 0, 0);
-    put(P.head, 0, 1.68, 0, 0);
+    put(P.head, 0, 1.68 - pump * 0.05, 0, 0);
     if (P.helmet) put(P.helmet, 0, 1.72, 0, 0);
     put(P.legL, -0.11, 0.9, 0, mode === 'kneel' ? -1.4 : sw);
     put(P.legR, 0.11, 0.9, 0, mode === 'kneel' ? -1.4 : -sw);
     let aL = -sw * 0.9, aR = sw * 0.9, zL = 0.06, zR = -0.06;
     if (mode === 'riot') { // ruce nahoře, mávají
       aL = Math.PI - 0.3 + Math.sin(t * 9 + this.phase[i]) * 0.35; aR = Math.PI - 0.3 + Math.sin(t * 9 + this.phase[i] + 1.7) * 0.35; zL = 0.25; zR = -0.25;
+    } else if (hip) { // hip hop: pumpování rukou na úder, mávání ze strany na stranu
+      const v = this.phase[i] % 3, sway = Math.sin(hb * Math.PI);
+      if (v < 1.3) { aR = 2.0 + pump * 0.9; zR = -0.18; aL = 0.45 + sway * 0.2; zL = 0.15; } // ruka nahoru, pumpuje
+      else if (v < 2.2) { aL = aR = Math.PI - 0.45; zL = 0.25 + sway * 0.4; zR = -0.25 + sway * 0.4; } // obě ruce nahoře, vlní se do stran
+      else { aR = 1.5 + pump * 0.5; zR = -0.1 + sway * 0.15; aL = 0.3; } // ukazuje k pódiu do rytmu
     } else if (mode === 'beat') { // pravá ruka s obuškem bije shora
       aR = 2.3 + Math.sin(t * 13 + this.phase[i]) * 1.1; aL = 0.4;
     } else if (mode === 'hang') { aL = aR = Math.PI; zL = 0.12; zR = -0.12; // visí na hrazdě

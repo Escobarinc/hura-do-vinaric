@@ -4,8 +4,8 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127214704';
-import { Crowd } from './crowd.js?v=20261127214704';
+import { makeHuman, animateHuman } from './entities.js?v=20261127231721';
+import { Crowd } from './crowd.js?v=20261127231721';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -53,6 +53,7 @@ const TRACKS = [
     ],
     parts: [[0, null, 'pole'], [11, 0], [28, 1], [45, -1], [56, null, 'pole'], [68, 0], [79, 1], [90, null, 'pole'], [101, -1], [118, 0], [130, null, 'pole'], [137, 1], [152, -1], [170, null, 'pole']] },
 ];
+const HIP_COLORS = ['#ffb000', '#b026ff', '#ff2d55', '#ffd700', '#7a2bff', '#ff7a00', '#ffffff', '#ff00d4'];
 const COLORS = ['#ff1f5a', '#00e5ff', '#39ff14', '#ffe600', '#b026ff', '#ff7a00', '#ffffff', '#ff00d4'];
 
 export const EFFECTS = [
@@ -70,7 +71,7 @@ export class Party {
   constructor(game) {
     this.game = game; this.active = false;
     this.fx = Object.fromEntries(EFFECTS.map(([k]) => [k, ['lasers', 'fan', 'heads', 'walls', 'led', 'beat', 'ceiling', 'strings', 'flames', 'confetti', 'ball', 'fog'].includes(k)]));
-    this.speed = 1; this.color = 0; this.master = 1;
+    this.speed = 1; this.color = 0; this.master = 1; this.lightStyle = 'auto';
   }
 
   start() {
@@ -336,6 +337,7 @@ export class Party {
     document.head.appendChild(css);
     const d = document.createElement('div'); d.id = 'party-panel';
     d.innerHTML = `<h3>🎛️ Světelný pult <span><button class="min" data-a="min">–</button><button class="min" data-a="end">✕</button></span></h3><div class="body"><div class="grid">${EFFECTS.map(([k, l], i) => `<button data-fx="${k}" class="${this.fx[k] ? 'on' : ''}">${i + 1}. ${l}</button>`).join('')}</div>
+<div class="row">Styl <button data-style="auto" class="on">AUTO</button><button data-style="disco">DISKO</button><button data-style="hiphop">HIP HOP</button></div>
 <div class="row">Rychlost <input type="range" min="0.3" max="3" step="0.1" value="1" data-a="speed"></div>
 <div class="row">Jas <input type="range" min="0.2" max="1.5" step="0.05" value="1" data-a="master"></div>
 <div class="row">${COLORS.map((c, i) => `<button class="sw" data-col="${i}" style="background:${c}"></button>`).join('')}</div>
@@ -346,6 +348,7 @@ export class Party {
       e.stopPropagation();
       const b = e.target.closest('button'); if (!b) return;
       if (b.dataset.fx) { const k = b.dataset.fx; this.fx[k] = !this.fx[k]; b.classList.toggle('on', this.fx[k]); }
+      if (b.dataset.style) { this.lightStyle = b.dataset.style; d.querySelectorAll('[data-style]').forEach((x) => x.classList.toggle('on', x === b)); }
       if (b.dataset.col) { this.color = +b.dataset.col; this.fx.rainbow = false; d.querySelector('[data-fx=rainbow]').classList.remove('on'); }
       const a = b.dataset.a;
       if (a === 'min') d.classList.toggle('collapsed');
@@ -359,10 +362,15 @@ export class Party {
   update(dt) {
     if (!this.active) return;
     this.t += dt;
-    const G = this.game, F = this.fx, t = this.t * this.speed, gy = this.gy;
+    const G = this.game, F = this.fx, gy = this.gy;
     const mt = this.music && !this.music.paused ? this.music.currentTime : this.t;
-    const beatF = (mt * (this.bpm || BPM)) / 60, beat = beatF % 1, pulse = F.beat ? Math.pow(1 - beat, 3) : 0.5, bar = Math.floor(beatF / 4);
-    const col = (k) => F.rainbow ? new THREE.Color().setHSL(((t * 0.08 + k * 0.07) % 1), 1, 0.55) : new THREE.Color(F.uv ? '#7a2bff' : COLORS[(this.color + k) % COLORS.length]);
+    const beatF = (mt * (this.bpm || BPM)) / 60, beat = beatF % 1, bar = Math.floor(beatF / 4);
+    const hipL = this.lightStyle === 'hiphop' || (this.lightStyle === 'auto' && TRACKS[this.ti]?.genre === 'hiphop');
+    // HIP HOP: světla se pohnou skokem na každý úder a pak drží, pomaleji; důraz na 2. a 4. dobu. DISKO: plynule a rychle
+    const t = hipL ? (Math.floor(beatF) + Math.min(1, beat * 5)) * 0.32 * this.speed : this.t * this.speed;
+    const pulse = !F.beat ? 0.5 : hipL ? Math.pow(1 - beat, 2) * (Math.floor(beatF) % 2 ? 1 : 0.45) : Math.pow(1 - beat, 3);
+    const PAL = hipL ? HIP_COLORS : COLORS;
+    const col = (k) => F.rainbow ? new THREE.Color().setHSL(((t * 0.08 + k * 0.07) % 1), 1, 0.55) : new THREE.Color(F.uv ? '#7a2bff' : PAL[(this.color + k) % PAL.length]);
     const M = this.master;
     // lasery
     for (const L of this.lasers) {
@@ -382,7 +390,7 @@ export class Party {
     // domy
     for (const W of this.walls) { if (W.m) { W.m.visible = F.walls; W.m.material.color.copy(col(W.k)); W.m.material.opacity = 0.15 * M * (0.5 + pulse); } if (W.light) { W.light.visible = F.walls; W.light.color.copy(col(W.k)); W.light.intensity = 70 * M * (0.4 + pulse); } }
     // strobo + oslňovače
-    const strobeOn = F.strobe && Math.floor(this.t * 14) % 2 === 0;
+    const strobeOn = F.strobe && (hipL ? Math.floor(beatF) % 2 === 1 && beat < 0.09 : Math.floor(this.t * 14) % 2 === 0);
     this.strobeL.intensity = strobeOn ? 220 * M : 0;
     for (const [k, B] of this.blinders.entries()) { B.visible = F.blinders || strobeOn; B.material.opacity = F.blinders ? (beat < 0.15 ? 1 : 0.15) * M : strobeOn ? 1 : 0; B.scale.setScalar(2 + (k % 2) * 0.5); }
     this.washL.color.copy(col(5)); this.washL.intensity = 110 * M * (0.55 + pulse * 0.7);
@@ -491,6 +499,7 @@ export class Party {
     // dav: skáčou do rytmu, ruce nahoře; u baru stojí a objednávají
     const C = this.crowd;
     C.updateCorpses(dt, (x, z) => this.game.city.ground(x, z), () => {});
+    const hip = TRACKS[this.ti]?.genre === 'hiphop'; C.beatF = beatF;
     for (const p of this.people) {
       if (C.dead[p.i]) continue;
       if (p.bar) { C.set(p.i, p.x, p.y, p.z, p.h, 0, Math.sin(t * 1.3 + p.ph) > 0.7 ? 'smoke' : 'walk', t); continue; }
@@ -498,6 +507,11 @@ export class Party {
       if (p.ax != null) { const need = L > p.rf - RW.f0 - 1.2; p.m = Math.max(0, Math.min(1, p.m + (need ? dt * 1.6 : -dt * 0.8))); }
       const x = p.ax != null ? p.x + (p.ax - p.x) * p.m : p.x, z = p.ax != null ? p.z + (p.az - p.z) * p.m : p.z;
       const fan = st2 && p.h2 != null, h = fan ? p.h2 : p.h;
+      if (hip) { // hip hop: pokyvování v kolenou na každý úder, pomalé houpání do stran
+        const lb = beatF + p.ph * 0.015, dip = Math.pow(Math.abs(Math.sin(lb * Math.PI)), 0.6) * 0.09 * (0.6 + p.hype);
+        C.set(p.i, x, p.y - dip + 0.05, z, h + Math.sin(lb * Math.PI * 0.5 + p.ph) * 0.28, p.m > 0 && p.m < 1 ? 1.2 : 0, 'hiphop', t);
+        continue;
+      }
       const j = bounce(p.ph) * (0.6 + p.hype) * (fan ? 1.4 : 1), mode = (fan || p.hype > 0.35 || pulse > 0.6) ? 'riot' : 'walk';
       C.set(p.i, x, p.y + j, z, h + Math.sin(t * 2 + p.ph) * (fan ? 0.12 : 0.2), p.m > 0 && p.m < 1 ? 1.2 : 0, mode, t);
     }
