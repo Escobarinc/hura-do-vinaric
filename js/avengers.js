@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128002233';
+import { makeHuman, animateHuman } from './entities.js?v=20261128002926';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -200,6 +200,10 @@ export class Avengers {
       this.release(); this.attack = false; this.sing = false; P.heroSinger = null;
       for (const H of this.heroes) { if (H.gone) continue; H.flying = false; H.leave = true; H.home = 'free'; this.route(H, this.W(2.9, 0)); H.path.push(this.W(2.2, 0)); }
       this.G.toast?.('🌀 Avengers odcházejí hvězdnou bránou');
+    } else if (c === 'rapBack' || c === 'avBack') {
+      if (!this.gate || this.gate.st !== 'open') { this.G.toast?.('Nejdřív otevři hvězdnou bránu'); return; }
+      const n = c === 'rapBack' ? this.rappersBack() : this.heroesBack(); this.tab = 'gate';
+      this.G.toast?.(n ? `↩ ${c === 'rapBack' ? 'Rappeři' : 'Avengers'} se vracejí bránou (${n})` : c === 'rapBack' ? 'Žádní rappeři bránou neodešli' : 'Žádní Avengers bránou neodešli');
     } else if (c === 'rapLeave') {
       if (!this.gate || this.gate.st !== 'open') { this.G.toast?.('Nejdřív otevři hvězdnou bránu'); return; }
       if (!P.rappers?.length) { this.G.toast?.('Na pódiu teď nejsou žádní rappeři'); return; }
@@ -334,25 +338,66 @@ export class Avengers {
       list.push([q, path, len]);
     }
     // gogo tanečnice a barmani jdou taky
-    this.extras = [];
+    const oldX = this.extras || []; this.extras = [];
     for (const E of [...P.gogos, ...P.bartenders]) {
-      if (E.out) continue; E.out = true;
+      const old = oldX.find((o) => o.ref === E);
+      if (old?.gone) { this.extras.push(old); continue; } // už je za bránou
+      E.out = true; if (E.shaker) E.shaker.visible = false;
       const x = E.m.position.x, z = E.m.position.z, [s, d] = this.nearStair(x, z), lane = (Math.random() - 0.5) * 3;
-      this.extras.push({ m: E.m, x, z, y: E.m.position.y, wait: 0.5 + Math.random() * 4 + d * 0.05, path: [[x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 2, P.gy], [...this.W(s.f + (Math.random() - 0.5) * 1.6, s.side * 5.9), P.gy], [...this.W(s.f, s.side * 2.4), this.top], [...this.W(s.f - 1, lane), this.top], ...gatePts(lane)] });
+      this.extras.push({ ref: E, home: old ? old.home : [x, z, E.m.position.y, E.m.rotation.y], m: E.m, x, z, y: E.m.position.y, wait: 0.5 + Math.random() * 4 + d * 0.05, path: [[x + (Math.random() - 0.5) * 2, z + (Math.random() - 0.5) * 2, P.gy], [...this.W(s.f + (Math.random() - 0.5) * 1.6, s.side * 5.9), P.gy], [...this.W(s.f, s.side * 2.4), this.top], [...this.W(s.f - 1, lane), this.top], ...gatePts(lane)] });
     }
     list.sort((a, b) => a[2] - b[2]);
     list.forEach(([q, path], k) => { q.exit = true; this.startWalk(q, path, k * 0.012); }); // vyrážejí hustě za sebou, tlačí se do brány
     this.G.toast?.(`🌀 ${list.length} lidí míří k hvězdné bráně`);
     this.renderPanel();
   }
+  /** Všichni, kdo prošli bránou (nebo k ní jdou), se vrátí na svá místa: z brány po molu, po schodech dolů a domů. */
+  startReturn() {
+    if (!this.gate || this.gate.st !== 'open') { if (!this.gate || this.gate.st === 'down' || this.gate.st === 'lower') this.toggleGate(); this.wantReturn = true; this.wantExodus = false; this.G.toast?.('🌀 Otevírám bránu – lidé se jí vrátí'); return; }
+    if (!this.stairs?.on) this.toggleStairs();
+    this.exodus = false; this.wantReturn = false; this.wantExodus = false;
+    const P = this.p, C = P.crowd, RW = P.RW; let k = 0, n = 0;
+    const down = (hx, hz, hy, lane) => { const [s] = this.nearStair(hx, hz); return [[...this.W(s.f - 1, lane), this.top], [...this.W(s.f, s.side * 2.4), this.top], [...this.W(s.f + (Math.random() - 0.5) * 1.6, s.side * 5.9), P.gy], [hx, hz, hy]]; };
+    const fromGate = (lane) => [[...this.W(3.0, lane * 0.6), this.top], [...this.W(RW.f0 - 0.3, lane), this.top]];
+    for (const q of P.people) {
+      if (C.dead[q.i] || (!q.gone && !q.exit)) continue;
+      const hx = q.ax != null && q.m > 0.5 ? q.ax : q.x, hz = q.ax != null && q.m > 0.5 ? q.az : q.z, lane = (Math.random() - 0.5) * 3.2;
+      q.exit = false; q.back = true; q.fast = true; q.spot = null; n++;
+      if (q.gone) { const [gx, gz] = this.W(2.2, lane * 0.4); q.gone = false; q.px = gx; q.pz = gz; q.py = this.top; q.st = 1; q.hid = true; q.wait = 0.2 + k++ * 0.012; q.path = [...fromGate(lane), ...down(hx, hz, q.y, lane)]; }
+      else { q.wait = 0; q.path = q.py > this.top - 0.5 ? down(hx, hz, q.y, lane) : [[hx, hz, q.y]]; }
+    }
+    for (const E of this.extras || []) {
+      const [hx, hz, hy] = E.home, lane = (Math.random() - 0.5) * 3; E.ret = true; n++;
+      if (E.gone) { const [gx, gz] = this.W(2.2, lane * 0.4); E.x = gx; E.z = gz; E.y = this.top; E.done = false; E.wait = 0.5 + Math.random() * 5; E.path = [...fromGate(lane), ...down(hx, hz, P.gy, lane), [hx, hz, hy]]; }
+      else { E.done = false; E.wait = Math.min(E.wait, 0.01); E.path = E.y > this.top - 0.5 ? [...down(hx, hz, P.gy, lane), [hx, hz, hy]] : [[hx, hz, hy]]; if (E.wait > 0) E.m.visible = true; }
+    }
+    n += this.rappersBack() + this.heroesBack();
+    this.tab = 'gate';
+    this.goneN = 0;
+    this.G.toast?.(n ? `↩ ${n} se vrací hvězdnou bránou` : 'Nikdo bránou neodešel');
+    this.renderPanel();
+  }
+  /** Rappeři, kteří odešli bránou, z ní vyjdou a vrátí se na svá místa. Vrací počet. */
+  rappersBack() {
+    const P = this.p; let n = 0;
+    for (const R of P.rappers || []) { if (!R.leave) continue; const [gx, gz] = this.W(2.3, 0); if (R.gone) { R.cx = gx; R.cz = gz; R.m.visible = true; R.mic.visible = true; this.zap(); } R.gone = false; R.leave = null; n++; }
+    return n;
+  }
+  /** Avengers, kteří odešli bránou, se jí vrátí. Vrací počet. */
+  heroesBack() {
+    const P = this.p, RW = P.RW; let n = 0;
+    for (const id of this.leftIds || []) { if (this.hero(id)) continue; this.summon(id); const H = this.hero(id); if (H) { [H.x, H.z] = this.W(2.3, 0); H.y = this.top; H.m.position.set(H.x, H.y, H.z); H.path = P.stage2 ? [this.W(RW.f0 - 0.5, 0), this.W(RW.f0 + 3.5 + H.k * 5.6, 0)] : [this.W(3.3, H.r)]; n++; } }
+    this.leftIds = []; return n;
+  }
   /** Gogo tanečnice a barmani na cestě k bráně. */
   updateExtras(dt) {
     for (const E of this.extras || []) {
       if (E.done) continue;
-      if (E.wait > 0) { E.wait -= dt; animateHuman(E.m, 0, dt); continue; }
+      if (E.wait > 0) { E.wait -= dt; if (E.wait <= 0 && E.ret) { E.m.visible = true; this.zap(); } else if (E.m.visible) animateHuman(E.m, 0, dt); continue; }
       const w = E.path[0];
       if (w && w[2] > E.y + 0.3 && !(this.stairs?.k > 0.6)) { animateHuman(E.m, 0, dt); continue; } // bez schodů čeká dole
-      if (!w) { E.done = true; E.m.visible = false; this.goneN++; this.flash(E.x, E.y + 1.2, E.z, 3, '#9fd8ff'); continue; }
+      if (!w && E.ret) { E.done = true; E.ret = false; E.gone = false; E.ref.out = false; E.m.position.set(E.home[0], E.home[2], E.home[1]); E.m.rotation.y = E.home[3]; if (E.ref.shaker) E.ref.shaker.visible = true; continue; } // zpět na svém místě
+      if (!w) { E.done = true; E.gone = true; E.m.visible = false; this.goneN++; this.flash(E.x, E.y + 1.2, E.z, 3, '#9fd8ff'); continue; }
       const dx = w[0] - E.x, dz = w[1] - E.z, d = Math.hypot(dx, dz), st = Math.min(d, 6.45 * dt);
       if (d > 0.05) { E.x += (dx / d) * st; E.z += (dz / d) * st; E.y += (w[2] - E.y) * Math.min(1, st / d); E.m.rotation.y = Math.atan2(dx, dz); }
       if (d < 0.25) { E.y = w[2]; E.path.shift(); }
@@ -362,19 +407,19 @@ export class Avengers {
   /** Krok jednoho člověka, který leze na pódium / jde k bráně / tančí na pódiu. Volá party v animatePeople. */
   stepPerson(q, dt, t, beatF, hip) {
     const C = this.p.crowd;
-    if (q.wait > 0) { q.wait -= dt; C.set(q.i, q.px, q.py + (q.py > this.p.gy + 1 ? 0 : 0), q.pz, q.h, 0, hip ? 'hiphop' : 'riot', t); return; }
+    if (q.wait > 0) { q.wait -= dt; if (q.hid) { if (q.wait <= 0) { q.hid = false; this.zap(); } return; } C.set(q.i, q.px, q.py, q.pz, q.h, 0, hip ? 'hiphop' : 'riot', t); return; }
     const w = q.path && q.path[0];
     // bez schodů se nahoru nikdo nedostane: kdo je dole, čeká namačkaný u kraje mola
     if (w && w[2] > q.py + 0.3 && q.py < this.top - 0.5 && !(this.stairs?.k > 0.6)) { C.set(q.i, q.px, q.py + Math.max(0, Math.sin(t * 7 + q.ph)) * 0.12, q.pz, q.fh ?? q.h, 0, 'riot', t); return; }
     if (w) {
-      const dx = w[0] - q.px, dz = w[1] - q.pz, d = Math.hypot(dx, dz), sp = q.exit ? 6.45 : 3, st = Math.min(d, sp * dt);
+      const dx = w[0] - q.px, dz = w[1] - q.pz, d = Math.hypot(dx, dz), sp = q.exit || q.fast ? 6.45 : 3, st = Math.min(d, sp * dt);
       if (d > 0.05) { q.px += (dx / d) * st; q.pz += (dz / d) * st; q.py += (w[2] - q.py) * Math.min(1, st / d); q.fh = Math.atan2(dx, dz); }
       if (d < 0.25) { q.py = w[2]; q.path.shift(); }
       C.set(q.i, q.px, q.py, q.pz, q.fh ?? q.h, sp, 'walk', t);
       return;
     }
     if (q.exit) { q.gone = true; q.st = 0; C.hide(q.i, true); this.goneN++; this.zap(); return; }
-    if (q.back) { q.st = 0; q.back = false; return; }
+    if (q.back) { q.st = 0; q.back = false; q.fast = false; return; }
     // tančí na pódiu čelem k davu
     const bounce = Math.max(0, Math.sin((beatF + q.ph * 0.05) * Math.PI * 2)) * 0.2;
     const [, r] = q.spot || [0, 0], face = this.p.FACE + (Math.abs(r) < 2.6 ? (r < 0 ? 1 : -1) * 1.2 : 0) + Math.sin(t * 1.5 + q.ph) * 0.4;
@@ -387,6 +432,7 @@ export class Avengers {
     const P = this.p, G = this.G, t = G.time;
     this.updateGate(dt); this.updateStairs(dt); this.updateExtras(dt);
     if (this.wantExodus && this.gate?.st === 'open') this.startExodus();
+    if (this.wantReturn && this.gate?.st === 'open') this.startReturn();
     if (this.exodus && this.pnl && (this._pt = (this._pt || 0) + dt) > 0.5) { this._pt = 0; const el = this.pnl.querySelector('.av-count'); if (el) el.textContent = `Bránou prošlo ${this.goneN} lidí`; }
     this.updateFx(dt); this.updateDoom(dt); this.updateStorm(dt);
     if (!this.heroes.length) return;
@@ -487,7 +533,7 @@ export class Avengers {
     const w = H.path[0];
     if (w) {
       const dx = w[0] - H.x, dz = w[1] - H.z, d = Math.hypot(dx, dz);
-      if (d < 0.2) { H.path.shift(); if (!H.path.length && H.leave) { H.gone = true; G.scene.remove(H.m); H.tag.visible = false; for (const a of H.acc) a.o.visible = false; for (const it of [this.hammer, this.axe]) if (it.holder === H.id && !it.fly) it.obj.visible = false; this.flash(H.x, H.y + 1.5, H.z, 6, '#9fd8ff'); G.audio?.blip?.(500, 0.3, 'sine', 0.08, 1600); if (!this.heroes.some((h) => !h.gone)) { G.toast?.('Avengers zmizeli v hvězdné bráně'); this.clearHeroes(); } } }
+      if (d < 0.2) { H.path.shift(); if (!H.path.length && H.leave) { H.gone = true; (this.leftIds ||= []).push(H.id); G.scene.remove(H.m); H.tag.visible = false; for (const a of H.acc) a.o.visible = false; for (const it of [this.hammer, this.axe]) if (it.holder === H.id && !it.fly) it.obj.visible = false; this.flash(H.x, H.y + 1.5, H.z, 6, '#9fd8ff'); G.audio?.blip?.(500, 0.3, 'sine', 0.08, 1600); if (!this.heroes.some((h) => !h.gone)) { G.toast?.('Avengers zmizeli v hvězdné bráně'); this.clearHeroes(); } } }
       else { const st = Math.min(d, H.speed * dt); H.x += (dx / d) * st; H.z += (dz / d) * st; H.h = Math.atan2(dx, dz); H.walking = true; }
     } else if (H.home !== 'free' || !this.attack) { if (H.armT <= 0 && !H.leave) { const ta = H.lookA ?? (this.p.FACE + Math.sin(t * 0.6 + H.k) * 0.3); H.h += Math.atan2(Math.sin(ta - H.h), Math.cos(ta - H.h)) * Math.min(1, dt * 4); } }
   }
@@ -804,6 +850,7 @@ export class Avengers {
       if (D.gate) this.toggleGate();
       if (D.stairs) this.toggleStairs();
       if (D.exo) this.startExodus();
+      if (D.ret) this.startReturn();
       if (D.doom) this.toggleDoom();
       if (D.vs) this.attackDoom(D.vs);
     });
@@ -832,7 +879,8 @@ export class Avengers {
       else h += `<div class="r"><button data-cmd="stage2">Na STAGE 2</button><button data-cmd="stage">Na pódium</button><button data-cmd="duel">🔨🪓 Duel Kapitán + Thor</button><button data-cmd="sing"${on(this.sing)}>🎤 Zpívat</button><button data-cmd="attack" class="${this.attack ? 'on' : 'red'}">${this.attack ? '⏹ Stop útok' : '⚔️ ÚTOK NA LIDI'}</button></div>`;
     } else if (tab === 'gate') {
       h += `<div class="r"><button data-gate="1"${on(gUp)}>${gUp ? '🌀 Zavřít bránu' : '🌀 STARGATE'}</button>${live.length ? `<button data-cmd="leave">Avengers pryč</button>` : ''}<button data-cmd="rapLeave">Rappeři pryč</button></div>`;
-      h += `<div class="r"><button data-stairs="1"${on(this.stairs?.on)}>🪜 Schody</button><button data-exo="1"${on(this.exodus)}>🌀 Všichni bránou</button><span class="info av-count">${this.exodus ? `Bránou prošlo ${this.goneN} lidí` : gOpen ? 'brána otevřená' : ''}</span></div>`;
+      h += `<div class="r"><button data-cmd="rapBack">↩ Rappeři zpět</button><button data-cmd="avBack">↩ Avengers zpět</button></div>`;
+      h += `<div class="r"><button data-stairs="1"${on(this.stairs?.on)}>🪜 Schody</button><button data-exo="1"${on(this.exodus)}>🌀 Všichni bránou</button><button data-ret="1">↩ Všichni zpět</button><span class="info av-count">${this.exodus ? `Bránou prošlo ${this.goneN} lidí` : gOpen ? 'brána otevřená' : ''}</span></div>`;
     } else {
       h += `<div class="r"><button data-doom="1" class="${dm ? 'on' : 'red'}">${dm ? '☠ Doom odletí' : '☠ DOOM'}</button>${dm ? `<span class="info av-doom" style="color:#39ff14">DOOM ❤ ${Math.max(0, Math.ceil(dm.hp))}</span>` : ''}</div>`;
       if (dm && dm.st === 'stand' && live.length) h += `<div class="r"><span>Útok</span>${live.map((x) => `<button data-vs="${x.id}"${on(!!x.vs)}>${x.name.replace('Kapitán Amerika', 'Kapitán')}</button>`).join('')}<button data-vs="all" class="go">Všichni</button></div>`;
@@ -851,7 +899,8 @@ export class Avengers {
   stop() {
     if (this.doom) this.endDoom(false, true);
     this.release(); if (this.heroes.length) this.clearHeroes();
-    this.gate = null; this.stairs = null; this.exodus = false; this.wantExodus = false; this.extras = [];
+    this.leftIds = [];
+    this.gate = null; this.stairs = null; this.exodus = false; this.wantExodus = false; this.wantReturn = false; this.extras = [];
     this.webs = []; this.beams = []; this.flashes = [];
     this.pnl?.remove(); this.pnl = null; this.unhookFloor();
   }
