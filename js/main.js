@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127165322';
-import { buildWorld } from './world.js?v=20261127165322';
-import { loadModels } from './models.js?v=20261127165322';
-import { Game } from './game.js?v=20261127165322';
-import { Hud } from './hud.js?v=20261127165322';
-import { Input } from './input.js?v=20261127165322';
-import { PrisonFX } from './prisonfx.js?v=20261127165322';
-import { Audio } from './audio.js?v=20261127165322';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127165322';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127192159';
+import { buildWorld } from './world.js?v=20261127192159';
+import { loadModels } from './models.js?v=20261127192159';
+import { Game } from './game.js?v=20261127192159';
+import { Hud } from './hud.js?v=20261127192159';
+import { Input } from './input.js?v=20261127192159';
+import { PrisonFX } from './prisonfx.js?v=20261127192159';
+import { Audio } from './audio.js?v=20261127192159';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127192159';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -16,6 +16,53 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (id) => document.getElementById(id);
+
+/** Zvuk zaklapnuté ocelové mříže (syntetizovaný: dunivý náraz, kovové zazvonění, drnčení odskoků). */
+let gateCtx = null;
+function gateSlam() {
+  try {
+    gateCtx ||= new (window.AudioContext || window.webkitAudioContext)();
+    const c = gateCtx;
+    if (c.state === 'suspended') c.resume();
+    const t0 = c.currentTime + 0.01, out = c.createGain();
+    out.gain.value = 0.9; out.connect(c.destination);
+    const noise = (dur) => { const b = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s2 = c.createBufferSource(); s2.buffer = b; return s2; };
+    // dunivý náraz
+    const o = c.createOscillator(), og = c.createGain();
+    o.type = 'sine'; o.frequency.setValueAtTime(75, t0); o.frequency.exponentialRampToValueAtTime(32, t0 + 0.35);
+    og.gain.setValueAtTime(1.0, t0); og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+    o.connect(og).connect(out); o.start(t0); o.stop(t0 + 0.55);
+    const n = noise(0.25), nf = c.createBiquadFilter(), ng = c.createGain();
+    nf.type = 'lowpass'; nf.frequency.value = 900; ng.gain.setValueAtTime(0.9, t0); ng.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
+    n.connect(nf).connect(ng).connect(out); n.start(t0);
+    // kovové zazvonění (neharmonické parciály oceli)
+    for (const [f, a, dcy] of [[196, 0.22, 1.6], [463, 0.16, 1.3], [811, 0.12, 1.1], [1247, 0.08, 0.9], [1890, 0.06, 0.7], [2733, 0.04, 0.5]]) {
+      const p2 = c.createOscillator(), pg = c.createGain();
+      p2.type = 'triangle'; p2.frequency.value = f * (0.995 + Math.random() * 0.01);
+      pg.gain.setValueAtTime(a, t0); pg.gain.exponentialRampToValueAtTime(0.0005, t0 + dcy);
+      p2.connect(pg).connect(out); p2.start(t0); p2.stop(t0 + dcy + 0.05);
+    }
+    // drnčení při odskocích mříže
+    for (const [dt, a] of [[0.13, 0.35], [0.24, 0.2], [0.31, 0.1]]) {
+      const r = noise(0.08), rf = c.createBiquadFilter(), rg = c.createGain();
+      rf.type = 'bandpass'; rf.frequency.value = 2600; rf.Q.value = 3;
+      rg.gain.setValueAtTime(a, t0 + dt); rg.gain.exponentialRampToValueAtTime(0.001, t0 + dt + 0.07);
+      r.connect(rf).connect(rg).connect(out); r.start(t0 + dt);
+    }
+  } catch { /* bez zvuku */ }
+}
+// mříž na úvodu: zvuk v okamžiku dopadu; kliknutím na nápis se celý efekt přehraje znovu (i se zvukem)
+{
+  const stage = document.querySelector('.logo-stage'), gate = stage?.querySelector('.gate');
+  if (gate) {
+    gate.addEventListener('animationstart', () => setTimeout(gateSlam, 520));
+    stage.style.cursor = 'pointer';
+    stage.addEventListener('click', () => {
+      const logo = stage.querySelector('.logo');
+      for (const el of [gate, logo]) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+    });
+  }
+}
 
 // automatická aktualizace: když je na webu novější verze (jiné ?v= u main.js), stránka se sama obnoví
 (async () => {
