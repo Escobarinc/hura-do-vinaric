@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128001635';
+import { makeHuman, animateHuman } from './entities.js?v=20261128001903';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -325,7 +325,7 @@ export class Avengers {
       list.push([q, path, len]);
     }
     list.sort((a, b) => a[2] - b[2]);
-    list.forEach(([q, path], k) => { q.exit = true; this.startWalk(q, path, k * 0.022); });
+    list.forEach(([q, path], k) => { q.exit = true; this.startWalk(q, path, k * 0.012); }); // vyrážejí hustě za sebou, tlačí se do brány
     this.G.toast?.(`🌀 ${list.length} lidí míří k hvězdné bráně`);
     this.renderPanel();
   }
@@ -335,7 +335,7 @@ export class Avengers {
     if (q.wait > 0) { q.wait -= dt; C.set(q.i, q.px, q.py + (q.py > this.p.gy + 1 ? 0 : 0), q.pz, q.h, 0, hip ? 'hiphop' : 'riot', t); return; }
     const w = q.path && q.path[0];
     if (w) {
-      const dx = w[0] - q.px, dz = w[1] - q.pz, d = Math.hypot(dx, dz), sp = q.exit ? 4.6 : 3, st = Math.min(d, sp * dt);
+      const dx = w[0] - q.px, dz = w[1] - q.pz, d = Math.hypot(dx, dz), sp = q.exit ? 6.45 : 3, st = Math.min(d, sp * dt);
       if (d > 0.05) { q.px += (dx / d) * st; q.pz += (dz / d) * st; q.py += (w[2] - q.py) * Math.min(1, st / d); q.fh = Math.atan2(dx, dz); }
       if (d < 0.25) { q.py = w[2]; q.path.shift(); }
       C.set(q.i, q.px, q.py, q.pz, q.fh ?? q.h, sp, 'walk', t);
