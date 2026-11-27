@@ -4,8 +4,8 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127213438';
-import { Crowd } from './crowd.js?v=20261127213438';
+import { makeHuman, animateHuman } from './entities.js?v=20261127213625';
+import { Crowd } from './crowd.js?v=20261127213625';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -105,7 +105,7 @@ export class Party {
     const sc = document.createElement('canvas'); sc.width = 1024; sc.height = 160; const sg = sc.getContext('2d');
     sg.fillStyle = '#000'; sg.fillRect(0, 0, 1024, 160); sg.font = '900 110px "Russo One", sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
     sg.shadowColor = '#00e5ff'; sg.shadowBlur = 30; sg.fillStyle = '#ffffff'; sg.fillText('DJ TIËSTO', 512, 84);
-    const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace;
+    const st = new THREE.CanvasTexture(sc); st.colorSpace = THREE.SRGBColorSpace; this.bannerC = sc; this.bannerT = st;
     add(new THREE.Mesh(new THREE.PlaneGeometry(12, 1.9), new THREE.MeshBasicMaterial({ map: st })), ...P(3.9, 0, 9.9), FACE);
     // DJ pult a DJ
     add(new THREE.Mesh(new THREE.BoxGeometry(4, 1.1, 1.2), mat('#141418', { metalness: 0.5 })), ...P(1.2, 0, 2.35), FACE);
@@ -379,12 +379,29 @@ export class Party {
   }
   drawLed(t, beat, col) {
     const c = this.ledC, g = c.getContext('2d'), w = c.width, h = c.height;
-    const mode = Math.floor(t / 6) % 4;
+    const tr = TRACKS[this.ti] || TRACKS[0], mode = Math.floor(t / 5) % 4;
     g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
+    // efekt v pozadí
     if (mode === 0) { for (let k = 0; k < 16; k++) { g.fillStyle = '#' + col(k).getHexString(); const bh = (0.2 + Math.abs(Math.sin(t * 3 + k * 0.7)) * 0.8) * h * (1 - beat * 0.4); g.fillRect(k * w / 16 + 2, h - bh, w / 16 - 4, bh); } }
     else if (mode === 1) { for (let r = 0; r < 8; r++) { g.strokeStyle = '#' + col(r).getHexString(); g.lineWidth = 6; g.beginPath(); g.arc(w / 2, h / 2, ((t * 80 + r * 40) % 320), 0, 7); g.stroke(); } }
-    else if (mode === 2) { g.font = '900 96px "Russo One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.fillStyle = '#' + col(1).getHexString(); g.globalAlpha = 0.6 + (1 - beat) * 0.4; g.fillText((TRACKS[this.ti]?.led || ['ONE MORE', 'TIME'])[beat < 0.5 ? 0 : 1], w / 2, h / 2); g.globalAlpha = 1; }
+    else if (mode === 2) { for (let k = 0; k < 12; k++) { g.fillStyle = '#' + col(k).getHexString(); g.globalAlpha = 0.7; const x = ((t * 140 + k * 90) % (w + 120)) - 60; g.fillRect(x, 0, 26, h); } g.globalAlpha = 1; }
     else { for (let k = 0; k < 400; k++) { g.fillStyle = '#' + col(k).getHexString(); g.fillRect(Math.random() * w, Math.random() * h, 6, 6); } g.fillStyle = 'rgba(255,255,255,' + (1 - beat) * 0.3 + ')'; g.fillRect(0, 0, w, h); }
+    // text přes efekt: střídá se název písně, interpret, kdo rapuje
+    const step = Math.floor(t / 2.5) % 4;
+    let txt = null, small = null;
+    if (tr.genre === 'hiphop') {
+      const name = this.curRapper;
+      txt = step === 0 ? tr.title.toUpperCase() : step === 1 ? null : step === 2 ? (name ? '🎤 ' + name.toUpperCase() : tr.led[0]) : tr.led[beat < 0.5 ? 0 : 1];
+      if (step === 0) small = tr.artist;
+    } else txt = step % 2 ? tr.led[beat < 0.5 ? 0 : 1] : (step === 0 ? 'DJ TIËSTO' : null);
+    if (txt) {
+      g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, h * 0.22, w, h * (small ? 0.62 : 0.56));
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '900 72px "Russo One", sans-serif';
+      g.shadowColor = '#' + col(2).getHexString(); g.shadowBlur = 20; g.fillStyle = '#fff'; g.globalAlpha = 0.75 + (1 - beat) * 0.25;
+      g.fillText(txt, w / 2, small ? h * 0.44 : h / 2, w - 30);
+      if (small) { g.font = '700 26px "Chakra Petch", sans-serif'; g.shadowBlur = 8; g.fillText(small, w / 2, h * 0.7, w - 30); }
+      g.globalAlpha = 1; g.shadowBlur = 0;
+    }
     this.ledT.needsUpdate = true;
   }
   firework() {
@@ -485,8 +502,22 @@ export class Party {
     } catch { this.music = null; }
     this.bpm = t.bpm;
     this.buildPerformers(t);
+    this.drawBanner(t);
     this.syncPlayer();
     this.game.toast?.(t.genre === 'hiphop' ? `🎤 ${t.title} – na pódium jdou rappeři` : `🎧 ${t.title} – DJ Tiësto`);
+  }
+  /** Nápis nad pódiem: DJ, nebo název písně a interpret. */
+  drawBanner(t) {
+    const c = this.bannerC; if (!c) return;
+    const g = c.getContext('2d'); g.fillStyle = '#000'; g.fillRect(0, 0, 1024, 160); g.textAlign = 'center'; g.textBaseline = 'middle';
+    if (t.genre !== 'hiphop') { g.font = '900 110px "Russo One", sans-serif'; g.shadowColor = '#00e5ff'; g.shadowBlur = 30; g.fillStyle = '#fff'; g.fillText('DJ TIËSTO', 512, 84); }
+    else {
+      g.shadowColor = '#ff00d4'; g.shadowBlur = 26; g.fillStyle = '#fff'; g.font = '900 80px "Russo One", sans-serif';
+      g.fillText(t.title.toUpperCase(), 512, 58, 990);
+      g.shadowColor = '#39ff14'; g.shadowBlur = 14; g.fillStyle = '#b8ff9c'; g.font = '700 38px "Chakra Petch", sans-serif';
+      g.fillText(t.artist, 512, 126, 990);
+    }
+    g.shadowBlur = 0; this.bannerT.needsUpdate = true;
   }
   clearPerformers() {
     const sc = this.game.scene;
@@ -535,7 +566,7 @@ export class Party {
       p.g.position.y = p.y + p.h; p.ring.material.color.setHSL((t * 0.3 + i * 0.5) % 1, 1, 0.55);
       if (p.down && p.h < -5.3) { this.group.remove(p.g); this.poles.splice(i, 1); }
     }
-    if (!this.rappers?.length) return;
+    if (!this.rappers?.length) { this.curRapper = null; return; }
     // kdo právě rapuje: -1 = všichni (refrén), null = nikdo, 'pole' = tanec u tyče
     let seg = tr.parts[0];
     for (const s of tr.parts) if (mt >= s[0]) seg = s;
@@ -571,6 +602,7 @@ export class Party {
       R.spot.material.opacity = 0.14 + bounce * 0.4;
     }
     // ukazatel, kdo rapuje
+    this.curRapper = who === -1 ? 'všichni' : who == null ? null : tr.rappers[who]?.name;
     const name = who === -1 ? 'všichni' : who === null ? (poleDance ? 'tanec u tyče' : '—') : tr.rappers[who]?.name;
     if (this.player) this.player.querySelector('.pp-t span').textContent = `${tr.artist} · 🎤 ${name}`;
   }
