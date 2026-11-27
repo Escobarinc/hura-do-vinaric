@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127151756';
-import { Crowd } from './crowd.js?v=20261127151756';
-import { PrisonFX } from './prisonfx.js?v=20261127151756';
+import { makeHuman, animateHuman } from './entities.js?v=20261127152209';
+import { Crowd } from './crowd.js?v=20261127152209';
+import { PrisonFX } from './prisonfx.js?v=20261127152209';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -265,7 +265,7 @@ export class MMA {
 #mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}
 @media (pointer:coarse),(max-width:700px){
 #mma-hud{top:calc(max(12px,env(safe-area-inset-top)) + 46px);width:94vw;font-size:11px}#mma-hud .bar{height:12px}#mma-hud .mid{min-width:78px;font-size:11px}#mma-hud .nm{font-size:11px}#mma-hud .st{font-size:12px}
-#mma-end,#mma-cam,#mma-play{bottom:auto!important;top:calc(max(12px,env(safe-area-inset-top)) + 128px)!important;font-size:12px!important;padding:6px 9px!important;border-radius:8px!important}
+#mma-end,#mma-cam,#mma-play{bottom:auto!important;top:calc(max(12px,env(safe-area-inset-top)) + 158px)!important;font-size:12px!important;padding:6px 9px!important;border-radius:8px!important}
 #mma-play{right:auto!important;left:10px!important}#mma-cam{right:auto!important;left:50%!important;transform:translateX(-50%)}#mma-end{right:10px!important}
 body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!important}}`;
     document.head.appendChild(css);
