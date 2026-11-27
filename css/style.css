@@ -4,8 +4,8 @@
   --bg: #0d1116;
   --panel: rgba(14, 18, 23, .78);
   --line: rgba(220, 235, 255, .14);
-  --brick: #2bff88;
-  --brick-hi: #7dffb3;
+  --brick: #39ff14;
+  --brick-hi: #a6ff8a;
   --gold: #ffd23f;
   --green: #5cc27a;
   --blue: #4a9be8;
@@ -20,7 +20,7 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 /* ---------- obrazovky ---------- */
 .screen { position: fixed; inset: 0; display: grid; place-items: center; padding: 16px; z-index: 20;
   background:
-    radial-gradient(1200px 600px at 50% 120%, rgba(43,255,136,.28), transparent 60%),
+    radial-gradient(1200px 600px at 50% 120%, rgba(57,255,20,.28), transparent 60%),
     radial-gradient(800px 500px at 50% -10%, rgba(255,210,63,.10), transparent 60%),
     linear-gradient(#141b23, #090c10);
 }
@@ -31,7 +31,7 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .logo { margin: 0; font-family: "Bungee", var(--font); font-weight: 900; text-transform: uppercase; font-size: clamp(54px, 13vw, 104px); letter-spacing: -.02em; line-height: .95; transform: rotate(-3deg); white-space: pre-line; }
 .logo b { white-space: nowrap; }
 .logo span { color: var(--ink); }
-.logo b { color: var(--brick-hi); text-shadow: 0 4px 0 #0b6b35; }
+.logo b { color: var(--brick-hi); text-shadow: 0 4px 0 #1a6b0a; }
 .logo span { text-shadow: 0 4px 0 #1c2530; }
 .logo.small { font-size: clamp(44px, 10vw, 76px); margin-bottom: 28px; }
 .claim { font-weight: 800; font-size: clamp(20px, 4.4vw, 28px); margin: 30px 0 10px; letter-spacing: -.01em; }
@@ -40,7 +40,7 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .btn { font: 800 18px var(--font); border: 0; border-radius: 12px; padding: 14px 34px; cursor: pointer; transition: transform .12s, filter .12s; }
 .btn:hover { transform: translateY(-2px); filter: brightness(1.08); }
 .btn:active { transform: translateY(1px); }
-.btn-primary { background: var(--brick); color: #04140b; box-shadow: 0 5px 0 #0b6b35; }
+.btn-primary { background: var(--brick); color: #04140b; box-shadow: 0 5px 0 #1a6b0a; }
 .btn-ghost { background: var(--gold); color: #2a1d06; box-shadow: 0 5px 0 #9a6b13; }
 .about { text-align: left; margin: 26px auto 0; background: rgba(255,255,255,.05); border: 1px solid var(--line); border-radius: 14px; padding: 16px 20px; font-size: 14px; line-height: 1.6; color: var(--muted); }
 .about h2 { margin: 0 0 6px; color: var(--ink); font-size: 18px; }
@@ -109,10 +109,10 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .bigmap canvas { width: min(92vw, 82vh); height: min(92vw, 82vh); border-radius: 14px; border: 1px solid var(--line); cursor: crosshair; }
 .bigmap p { margin: 0; font-size: 13px; color: var(--muted); }
 .teleport { position: absolute; z-index: 50; left: 50%; top: 50%; transform: translate(-50%, -50%); background: rgba(14,18,23,.94); border: 1px solid var(--line); border-radius: 16px; padding: 14px; display: grid; grid-template-columns: 1fr 1fr; gap: 6px; pointer-events: auto !important; width: min(520px, 92vw); max-height: 80vh; overflow: auto; }
-.teleport .tp-x { grid-column: 1 / -1; text-align: center; background: rgba(43,255,136,.85); }
+.teleport .tp-x { grid-column: 1 / -1; text-align: center; background: rgba(57,255,20,.85); }
 .teleport h3 { grid-column: 1 / -1; margin: 4px 6px 6px; }
 .teleport button { font: 700 14px var(--font); text-align: left; background: rgba(255,255,255,.06); color: var(--ink); border: 1px solid var(--line); border-radius: 10px; padding: 9px 12px; cursor: pointer; }
-.teleport button:hover { background: rgba(43,255,136,.35); }
+.teleport button:hover { background: rgba(57,255,20,.35); }
 
 /* ---------- dotyk ---------- */
 .touch { position: absolute; inset: 0; pointer-events: none !important; }
@@ -122,9 +122,9 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .tb-f { background: rgba(200,40,40,.7); }
 .touch-help { display: none; }
 .tbi { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; border: 1px solid rgba(255,255,255,.3); background: rgba(255,255,255,.08); font-size: 13px; }
-.tbi.tb-e { background: rgba(43,255,136,.75); }
+.tbi.tb-e { background: rgba(57,255,20,.75); }
 .tb { width: 64px; height: 64px; border-radius: 50%; border: 2px solid rgba(255,255,255,.3); background: rgba(14,18,23,.55); color: #fff; font: 800 22px var(--font); touch-action: none; }
-.tb-e { background: rgba(43,255,136,.75); }
+.tb-e { background: rgba(57,255,20,.75); }
 .tb.active { background: rgba(255,210,63,.7); }
 
 @media (max-width: 700px), (pointer: coarse) {
@@ -212,12 +212,25 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 
 /* svítivá zelená: tmavý text na zelených plochách, jemná záře */
 .tb-e, .tbi.tb-e, .teleport .tp-x { color: #04140b !important; }
-.logo b { text-shadow: 0 4px 0 #0b6b35, 0 0 28px rgba(43,255,136,.45); }
+.logo b { text-shadow: 0 4px 0 #1a6b0a, 0 0 28px rgba(57,255,20,.45); }
 .fc em { color: #04140b; }
-.btn-primary:hover { filter: brightness(1.08); box-shadow: 0 5px 0 #0b6b35, 0 0 22px rgba(43,255,136,.45); }
+.btn-primary:hover { filter: brightness(1.08); box-shadow: 0 5px 0 #1a6b0a, 0 0 22px rgba(57,255,20,.45); }
 .logo { letter-spacing: 0; }
 .logo, #menu .claim, .fc-top b, .controls-panel h3 { font-weight: 400 !important; } /* Bungee má jen jeden řez */
 /* větší tlačítka na úvodu */
 #menu .btn { font-size: 22px; padding: 18px 46px; border-radius: 14px; min-width: 190px; }
 #menu .menu-actions { gap: 16px; }
 @media (max-width: 760px) { #menu .btn { font-size: 19px; padding: 15px 30px; min-width: 150px; } }
+
+/* neonový nápis */
+.logo b {
+  color: #eaffe0;
+  text-shadow: 0 0 4px #fff, 0 0 10px #39ff14, 0 0 22px #39ff14, 0 0 42px #39ff14, 0 0 80px #2ecc10, 0 0 120px #2ecc10 !important;
+  animation: neon-flicker 6s infinite;
+}
+.logo span { text-shadow: 0 0 6px rgba(255,255,255,.55), 0 0 18px rgba(57,255,20,.35) !important; }
+@keyframes neon-flicker {
+  0%, 18%, 22%, 25%, 53%, 57%, 100% { opacity: 1; }
+  20%, 24%, 55% { opacity: .55; text-shadow: 0 0 2px #fff, 0 0 6px #39ff14 !important; }
+}
+@media (prefers-reduced-motion: reduce) { .logo b { animation: none; } }

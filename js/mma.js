@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127150629';
-import { Crowd } from './crowd.js?v=20261127150629';
-import { PrisonFX } from './prisonfx.js?v=20261127150629';
+import { makeHuman, animateHuman } from './entities.js?v=20261127150739';
+import { Crowd } from './crowd.js?v=20261127150739';
+import { PrisonFX } from './prisonfx.js?v=20261127150739';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -261,7 +261,7 @@ export class MMA {
 #mma-hud .bar i{display:block;height:100%;transition:width .15s}#mma-hud .b i{background:linear-gradient(90deg,#2b5fd8,#79a8ff)}#mma-hud .r{justify-content:flex-end}#mma-hud .r i{background:linear-gradient(270deg,#d82b2b,#ff8a7a)}
 #mma-hud .mid{min-width:96px;background:rgba(0,0,0,.75);border-radius:6px;padding:3px 6px;font-size:12px}#mma-hud .nm{display:flex;justify-content:space-between;margin-top:3px;text-shadow:0 1px 3px #000;font-size:12px}
 #mma-hud .st{margin-top:6px;background:rgba(0,0,0,.65);display:inline-block;padding:4px 10px;border-radius:8px;font-size:13px;max-width:94vw}
-#mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#2bff88;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}`;
+#mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}`;
     document.head.appendChild(css);
     const d = document.createElement('div'); d.id = 'mma-hud';
     d.innerHTML = '<div class="row"><div class="bar b"><i id="mma-b"></i></div><div class="mid" id="mma-mid"></div><div class="bar r"><i id="mma-r"></i></div></div><div class="nm"><span id="mma-bn"></span><span id="mma-rn"></span></div><div class="st" id="mma-st"></div>';
@@ -275,7 +275,7 @@ export class MMA {
       c.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCam(); c.blur(); });
       document.body.appendChild(c); this.camBtn = c;
       const pb = document.createElement('button'); pb.textContent = '🥊 Hraj za vězně';
-      pb.style.cssText = 'position:fixed;right:16px;bottom:108px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#2bff88;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer';
+      pb.style.cssText = 'position:fixed;right:16px;bottom:108px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer';
       pb.addEventListener('click', (e) => { e.stopPropagation(); this.takeOver(); });
       document.body.appendChild(pb); this.playBtn = pb;
     }

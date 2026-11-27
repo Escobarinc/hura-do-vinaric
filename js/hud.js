@@ -1,4 +1,4 @@
-import { fmtMoney } from './util.js?v=20261127150629';
+import { fmtMoney } from './util.js?v=20261127150739';
 
 const $ = (id) => document.getElementById(id);
 const MAP_SCALE = 0.5; // px na metr v předrenderované mapě
@@ -209,7 +209,7 @@ export class Hud {
     for (const l of game.landmarks) mark(l.x, l.z, '#ffd23f', size / 260, l.label);
     if (game.waypoint) mark(game.waypoint.x, game.waypoint.z, '#b98cff', size / 120);
     mark(P.x, P.z, '#ffffff', size / 110);
-    mark(P.x, P.z, '#2bff88', size / 200);
+    mark(P.x, P.z, '#39ff14', size / 200);
     c.onclick = (ev) => {
       const r = c.getBoundingClientRect();
       const x = ((ev.clientX - r.left) / r.width) * H * 2 - H;
