@@ -4,9 +4,9 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128001903';
-import { Avengers } from './avengers.js?v=20261128001903';
-import { Crowd } from './crowd.js?v=20261128001903';
+import { makeHuman, animateHuman } from './entities.js?v=20261128001937';
+import { Avengers } from './avengers.js?v=20261128001937';
+import { Crowd } from './crowd.js?v=20261128001937';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -496,6 +496,7 @@ export class Party {
     this.dj.position.y = this.P(0, 0, 1.8)[1] + bounce(0) * 0.6;
     // gogo tanečnice: krouží kolem tyče, vlní se, ruce nahoře
     for (const D of this.gogos) {
+      if (D.out) continue; // odchází hvězdnou bránou
       const a = t * 0.9 + D.ph, x = D.cx + Math.cos(a) * 0.45, z = D.cz + Math.sin(a) * 0.45;
       D.m.position.set(x, D.y + bounce(D.ph) * 0.7, z); D.m.rotation.y = Math.atan2(D.cx - x, D.cz - z) + Math.PI / 2 + Math.sin(t * 2 + D.ph) * 0.4;
       animateHuman(D.m, 0, dt);
@@ -507,6 +508,7 @@ export class Party {
     }
     // barmani: cyklus 6 s – míchání v šejkru nad hlavou, nalévání do sklenic, podání
     for (const B of this.bartenders) {
+      if (B.out) { B.shaker.visible = false; continue; } // odchází hvězdnou bránou
       animateHuman(B.m, 0, dt);
       const cyc = ((t + B.ph * 2) % 6) / 6, sh = cyc < 0.55, pour = cyc >= 0.55 && cyc < 0.85;
       const s = Math.sin(t * 22 + B.ph);
