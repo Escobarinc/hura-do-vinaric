@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127200547';
-import { Crowd } from './crowd.js?v=20261127200547';
-import { PrisonFX } from './prisonfx.js?v=20261127200547';
+import { makeHuman, animateHuman } from './entities.js?v=20261127200817';
+import { Crowd } from './crowd.js?v=20261127200817';
+import { PrisonFX } from './prisonfx.js?v=20261127200817';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -22,13 +22,19 @@ const VOICE = { // hlášky hlasatelky (nahrané, hrají i na telefonu)
 };
 
 /** Znak OKTAGON (podle dodaného loga) do plátna: střed cx, cy, velikost size (šířka znaku). */
-function oktagonMark(g, cx, cy, size) {
+// dodané logo (žlutý osmiúhelník, průhledný střed) – načte se jednou, plátna se po načtení překreslí
+const LOGO = new Image(); LOGO.src = 'assets/mma/oktagon-logo.png';
+const LOGO_WAIT = [];
+LOGO.onload = () => { for (const f of LOGO_WAIT.splice(0)) f(); };
+function withLogo(fn) { if (LOGO.complete && LOGO.naturalWidth) fn(); else LOGO_WAIT.push(fn); }
+function oktagonMark(g, cx, cy, size, tex = null) {
+  // černý podklad pod logem; samotné logo (obrázek) se dokreslí, jakmile je načtené
   // žlutý osmiúhelníkový rám (podle dodaného loga) na černém podkladu
   const k = size / 1300, P = (pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo : g.moveTo).call(g, cx + (x - 650) * k, cy + (y - 650) * k)); g.closePath(); };
   g.save();
-  P([[298, 13], [997, 13], [1287, 303], [1287, 997], [997, 1287], [298, 1287], [13, 997], [13, 303]]); g.fillStyle = '#ffd700'; g.fill();
-  P([[318, 125], [977, 125], [1175, 321], [1175, 977], [977, 1175], [318, 1175], [125, 977], [125, 321]]); g.fillStyle = '#0b0b0b'; g.fill();
+  P([[60, 330], [330, 60], [970, 60], [1240, 330], [1240, 970], [970, 1240], [330, 1240], [60, 970]]); g.fillStyle = '#0b0b0b'; g.fill();
   g.restore();
+  withLogo(() => { g.drawImage(LOGO, cx - size / 2, cy - size / 2, size, size); if (tex) tex.needsUpdate = true; });
 }
 /** Logo OKTAGON MMA: žluté OKTAGON se znakem místo posledního O a pod ním MMA. */
 function oktagonLogo(g, cx, cy, w, mmaColor = '#111111') {
@@ -65,6 +71,7 @@ export class MMA {
     oktagonMark(cg, 512, 512, 560);
     cg.save(); cg.fillStyle = '#ffd700'; cg.font = '900 92px "Russo One", "Arial Black", sans-serif'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.fillText('OKTAGON', 512, 490); cg.fillStyle = '#ffffff'; cg.font = '900 58px "Russo One", "Arial Black", sans-serif'; cg.fillText('MMA', 512, 575); cg.restore();
     const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
+    withLogo(() => { ft.needsUpdate = true; });
     // osmiboká plošina (CylinderGeometry s 8 stranami = oktagon)
     const deck = new THREE.Mesh(new THREE.CylinderGeometry(R, R, DECK, 8, 1), [mat('#1a1a1a'), new THREE.MeshStandardMaterial({ map: ft, roughness: 0.9 }), mat('#1a1a1a')]);
     deck.rotation.y = 0; deck.position.set(C.x, gy + DECK / 2, C.z); deck.receiveShadow = true; deck.castShadow = true;
@@ -506,6 +513,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     cg.fillStyle = '#0d0e10'; cg.fillRect(0, 0, 1024, 256);
     oktagonLogo(cg, 512, 105, 900, '#ffffff');
     const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+    withLogo(() => { tx.needsUpdate = true; });
     for (const sd of [-1, 1]) { const sgn = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.4), new THREE.MeshStandardMaterial({ map: tx, emissive: '#ffffff', emissiveMap: tx, emissiveIntensity: 0.25 })); sgn.position.set(sd * 1.28, 2.6, -1.2); sgn.rotation.y = sd * Math.PI / 2; g.add(sgn); }
     for (const [z, n] of [[6.9, 1], [4.6, 1], [-4.5, 2], [-5.9, 2]]) for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.45 * n, 16), tyre); w.rotation.z = Math.PI / 2; w.position.set(sd * 1.15, 0.52, z); g.add(w); }
     const lights = new THREE.MeshStandardMaterial({ color: '#fff', emissive: '#fff6d8', emissiveIntensity: 2 });
