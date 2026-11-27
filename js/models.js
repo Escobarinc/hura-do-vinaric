@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { pick } from './util.js?v=20261127201209';
+import { pick } from './util.js?v=20261127202856';
 
 export const KIT = { cars: {}, chars: [], ready: false };
 

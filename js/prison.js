@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127201209';
-import { labelTexture } from './textures.js?v=20261127201209';
-import { Crowd } from './crowd.js?v=20261127201209';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127202856';
+import { labelTexture } from './textures.js?v=20261127202856';
+import { Crowd } from './crowd.js?v=20261127202856';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1293,7 +1293,7 @@ export class PrisonLife {
       e.stopPropagation();
       const a = e.target.dataset?.a;
       if (a === 'x') box.remove();
-      if (a === '1' || a === '3') { box.remove(); this.goToPrison(); this.game.mma.start(a === '3' ? (play ? 'teamPlay' : 'team') : (play ? 'play' : 'watch')); }
+      if (a === '1' || a === '3') { box.remove(); this.game.mma.start(a === '3' ? (play ? 'teamPlay' : 'team') : (play ? 'play' : 'watch')); }
     });
   }
   /** Tlačítko oběd / večeře: nejdřív výběr budov, které půjdou. */

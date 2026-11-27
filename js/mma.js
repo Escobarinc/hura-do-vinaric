@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127201209';
-import { Crowd } from './crowd.js?v=20261127201209';
-import { PrisonFX } from './prisonfx.js?v=20261127201209';
+import { makeHuman, animateHuman } from './entities.js?v=20261127202856';
+import { Crowd } from './crowd.js?v=20261127202856';
+import { PrisonFX } from './prisonfx.js?v=20261127202856';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -277,7 +277,7 @@ export class MMA {
     this.team = mode === 'team' || mode === 'teamPlay';
     G.setHour = 21; // turnaje jsou vždy večer, za tmy
     G.wanted = 0;
-    this.cinematic = true; // úvod (oktagon, nástup, moderátor) vždy kamerou arény; divák pak dostane zpět pohled ze hry
+    this.cinematic = this.playAs; // divák zůstává, kde je (kamera arény jen na klávesu V)
     if (this.playAs) { if (G.vehicle) G.exit?.(); G.mode = 'mma'; G.player.mesh.visible = false; }
     const N = this.team ? 3 : 1;
     const guardNames = ['Bachař Novák', 'Bachař Dvořák', 'Bachař Černý'], conNames = ['Vězeň „Kladivo“', 'Vězeň „Žiletka“', 'Vězeň „Tank“'];
@@ -461,7 +461,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       if (this.mc?.leaving && (this.mc.gone || this.mc.pi >= 2)) {
         let open = false;
         for (const D of this.cageDoors || []) if (D.cur > 0) { open = true; const st = Math.min(D.cur, dt * 2.2); D.pivot.rotateY(-st); D.cur -= st; if (D.cur <= 0) { this.game.audio?.noise?.(0.25, 0.8, 300); this.game.audio?.blip?.(140, 0.2, 'square', 0.1, -40); } }
-        if (!open) { this.phase = 'intro'; this.t = 0; this.status = ''; if (!this.playAs && this.cinematic) this.toggleCam(); this.say('rules', 'Pravidla znáte. Pěsti a kopy. Ťukněte si… a bojujte!'); }
+        if (!open) { this.phase = 'intro'; this.t = 0; this.status = ''; this.say('rules', 'Pravidla znáte. Pěsti a kopy. Ťukněte si… a bojujte!'); }
       }
     } else if (ph === 'teardown') {
       this.teardownStep(dt);
