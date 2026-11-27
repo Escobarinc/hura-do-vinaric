@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127195253';
-import { Crowd } from './crowd.js?v=20261127195253';
-import { PrisonFX } from './prisonfx.js?v=20261127195253';
+import { makeHuman, animateHuman } from './entities.js?v=20261127195519';
+import { Crowd } from './crowd.js?v=20261127195519';
+import { PrisonFX } from './prisonfx.js?v=20261127195519';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -104,14 +104,23 @@ export class MMA {
       E.stairTop = [C.x + ux * (ul + 0.2), C.z + uz * (ul + 0.2)];
       const carpetLen = 12;
       E.carpetStart = [E.stairFoot[0] + ux * carpetLen, E.stairFoot[1] + uz * carpetLen];
-      const carpet = new THREE.Mesh(new THREE.PlaneGeometry(1.6, carpetLen), mat(team === 'blue' ? '#13307a' : '#9c1010', { roughness: 0.95 }));
+      const carpet = new THREE.Mesh(new THREE.PlaneGeometry(1.6, carpetLen), mat('#9c1010', { roughness: 0.95 }));
       carpet.rotation.order = 'YXZ'; carpet.rotation.y = Math.atan2(ux, uz); carpet.rotation.x = -Math.PI / 2;
       carpet.position.set((E.stairFoot[0] + E.carpetStart[0]) / 2, gy + 0.03, (E.stairFoot[1] + E.carpetStart[1]) / 2);
       g.add(carpet);
-      for (const sd of [-1, 1]) for (let k = 0; k <= 5; k++) {
-        const d = (k / 5) * carpetLen, px = E.stairFoot[0] + ux * d - uz * sd * 1.1, pz = E.stairFoot[1] + uz * d + ux * sd * 1.1;
-        const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 1.0, 8), brass); p2.position.set(px, gy + 0.5, pz); g.add(p2);
+      // pochodně podél koberce: kovový sloup s miskou a hořícím ohněm
+      this.torches ||= [];
+      this.fireT ||= (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const x = c.getContext('2d'); const gr = x.createRadialGradient(64, 80, 4, 64, 70, 60); gr.addColorStop(0, 'rgba(255,255,220,1)'); gr.addColorStop(0.25, 'rgba(255,200,60,.95)'); gr.addColorStop(0.55, 'rgba(255,90,10,.6)'); gr.addColorStop(1, 'rgba(120,20,0,0)'); x.fillStyle = gr; x.beginPath(); x.moveTo(64, 4); x.quadraticCurveTo(118, 70, 96, 112); x.quadraticCurveTo(64, 128, 32, 112); x.quadraticCurveTo(10, 70, 64, 4); x.fill(); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+      for (const sd of [-1, 1]) for (let k = 0; k <= 4; k++) {
+        const d = (k / 4) * carpetLen, px = E.stairFoot[0] + ux * d - uz * sd * 1.25, pz = E.stairFoot[1] + uz * d + ux * sd * 1.25;
+        const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.08, 1.5, 8), mat('#2a2a2a', { metalness: 0.7 })); pole.position.set(px, gy + 0.75, pz); g.add(pole);
+        const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.09, 0.18, 12), brass); bowl.position.set(px, gy + 1.55, pz); g.add(bowl);
+        const fire = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fireT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+        fire.position.set(px, gy + 1.95, pz); fire.scale.set(0.6, 0.85, 1); g.add(fire);
+        this.torches.push({ fire, y: gy + 1.95, ph: Math.random() * 6 });
       }
+      // pár světel od ohňů (ne u každé pochodně – šetří výkon)
+      for (const d of [0.2, 0.8]) { const l = new THREE.PointLight('#ff8a30', 6, 9, 1.6); l.position.set(E.stairFoot[0] + ux * carpetLen * d, gy + 2.2, E.stairFoot[1] + uz * carpetLen * d); g.add(l); this.torches.push({ light: l, ph: Math.random() * 6 }); }
       const arch = new THREE.Group();
       for (const sd of [-1, 1]) { const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.3, 0.3), archM); col.position.set(sd * 1.5, 1.65, 0); arch.add(col); }
       const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
@@ -154,17 +163,24 @@ export class MMA {
     this.hidden = [];
     for (const pr of city.props || []) if (Math.hypot(pr.x - C.x, pr.z - C.z) < 22 && pr.obj.visible) { pr.obj.visible = false; this.hidden.push(pr); if (pr.obst) { pr._r = pr.obst.r; pr.obst.r = 0; } }
     // fanoušci: 500 vězňů kolem klece (mimo uličku)
-    this.crowd = new Crowd(scene, { capacity: 500, shirt: '#3f4f63', pants: '#34404f' });
+    this.crowd = new Crowd(scene, { capacity: 800, shirt: '#3f4f63', pants: '#34404f' });
     this.fans = [];
-    const aisle = (a, rr) => [ENTRY_A.blue, ENTRY_A.red].some((A) => Math.abs(Math.atan2(Math.sin(a - A), Math.cos(a - A))) < 0.25 + 1.5 / rr);
+    // ulička pro zápasníky: pás 2×1,9 m kolem koberce (od dveří klece až za bránu) zůstane volný
+    const inAisle = (x, z) => Object.values(this.entries).some((E) => {
+      const ax = E.doorPt[0], az = E.doorPt[1], bx = E.carpetStart[0] + E.ux * 3, bz = E.carpetStart[1] + E.uz * 3;
+      const ex = bx - ax, ez = bz - az, l2 = ex * ex + ez * ez, t = ((x - ax) * ex + (z - az) * ez) / l2;
+      if (t < 0 || t > 1) return false;
+      return Math.hypot(ax + ex * t - x, az + ez * t - z) < 1.9;
+    });
+    const aisle = () => false;
     let n = 0;
-    for (let ring = 0; n < 500 && ring < 14; ring++) {
-      const rr = 8.6 + ring * 0.8, cnt = Math.floor((2 * Math.PI * rr) / 0.75);
-      for (let k = 0; k < cnt && n < 500; k++) {
+    for (let ring = 0; n < 800 && ring < 16; ring++) {
+      const rr = 8.4 + ring * 0.75, cnt = Math.floor((2 * Math.PI * rr) / 0.7);
+      for (let k = 0; k < cnt && n < 800; k++) {
         const a = (k / cnt) * Math.PI * 2 + (ring % 2) * 0.2;
         if (aisle(a, rr)) continue;
         const x = C.x + Math.cos(a) * rr + (Math.random() - 0.5) * 0.3, z = C.z + Math.sin(a) * rr + (Math.random() - 0.5) * 0.3;
-        if (city.collide(x, z, 0.35).hit || city.buildingAt(x, z)) continue; // ne do zdi / budovy
+        if (inAisle(x, z) || city.collide(x, z, 0.35).hit || city.buildingAt(x, z)) continue; // ne do uličky, zdi, budovy
         this.fans.push({ i: n++, x, z, y: city.ground(x, z), h: Math.atan2(C.x - x, C.z - z), ph: Math.random() * 6, hype: Math.random() });
       }
     }
@@ -174,6 +190,7 @@ export class MMA {
     for (let k = 0; k < 50; k++) {
       const a = (k / 50) * Math.PI * 2; if (aisle(a, 7.3)) continue;
       const x = C.x + Math.cos(a) * 7.3, z = C.z + Math.sin(a) * 7.3;
+      if (inAisle(x, z)) continue;
       this.guardPos.push({ x, z, y: city.ground(x, z), h: Math.atan2(x - C.x, z - C.z) + Math.PI * (k % 2) }); // střídavě čelem k divákům / ke kleci
     }
     this.dogs = [];
@@ -862,6 +879,11 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
   }
   /** Reflektory krouží po kleci, lasery se míhají, barevná světla pulzují. */
   updateLights(dt) {
+    const tt = this.game.time;
+    for (const T of this.torches || []) {
+      if (T.fire) { const f = 1 + Math.sin(tt * 13 + T.ph) * 0.12 + Math.sin(tt * 7.3 + T.ph * 2) * 0.08; T.fire.scale.set(0.6 * f, 0.85 * (2 - f), 1); T.fire.position.y = T.y + Math.sin(tt * 9 + T.ph) * 0.03; }
+      if (T.light) T.light.intensity = 5 + Math.sin(tt * 11 + T.ph) * 1.5 + Math.random();
+    }
     const t = this.game.time, v = new THREE.Vector3(), up = new THREE.Vector3(0, -1, 0);
     for (const b of this.beams) {
       const tx = C.x + Math.cos(t * 0.6 + b.ph) * 2.2, tz = C.z + Math.sin(t * 0.7 + b.ph) * 2.2, ty = this.deckTop;
