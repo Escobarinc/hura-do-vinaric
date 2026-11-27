@@ -9,7 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=Bungee&family=Russo+One&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="css/style.css?v=20261127152720">
+<link rel="stylesheet" href="css/style.css?v=20261127155453">
 <script type="importmap">
 { "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js", "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/" } }
 </script>
@@ -116,6 +116,7 @@
       <tr><td><kbd>6</kbd> / <kbd>0</kbd></td><td>pěsti (bez zbraně)</td></tr>
       <tr><td>Levé tlačítko</td><td>střelba / hod granátu · zničí i autobusy, policii a hasiče</td></tr>
       <tr><td><kbd>6</kbd> + myš / F</td><td>pěstní souboj – 3 rány složí, protivník se brání</td></tr>
+      <tr><td>MMA (hraješ)</td><td>A/D pohyb · W skok · S kryt · F pěst (kombo) · G kop (+S nízký, +W výskokový) · Q salto (+vpřed salto kop) · O nůž</td></tr>
       <tr><td>Auto</td><td>přejetí lidí (nad ~15 km/h)</td></tr>
       <tr><th colspan="2">Mapa a svět</th></tr>
       <tr><td><kbd>M</kbd></td><td>velká mapa (klikem nastavíš cíl)</td></tr>
@@ -162,12 +163,14 @@
     <div class="tbtns-mma" aria-label="MMA">
       <button data-k="KeyF" class="tb tb-big tb-punch" aria-label="Pěst">👊<small>PĚST</small></button>
       <button data-k="KeyG" class="tb tb-big tb-kick" aria-label="Kop">🦵<small>KOP</small></button>
-      <button data-k="ShiftLeft" class="tb tb-mid" aria-label="Kryt">🛡️</button>
-      <button data-k="KeyO" class="tb tb-mid" aria-label="Nůž">🔪</button>
+      <button data-k="KeyW" class="tb tb-mid" aria-label="Skok">⤒<small>SKOK</small></button>
+      <button data-k="KeyQ" class="tb tb-mid" aria-label="Salto">🤸<small>SALTO</small></button>
+      <button data-k="ShiftLeft" class="tb tb-mid" aria-label="Kryt">🛡️<small>KRYT</small></button>
+      <button data-k="KeyO" class="tb tb-mid" aria-label="Nůž">🔪<small>NŮŽ</small></button>
     </div>
   </div>
 </div>
 
-<script type="module" src="js/main.js?v=20261127152720"></script>
+<script type="module" src="js/main.js?v=20261127155453"></script>
 </body>
 </html>

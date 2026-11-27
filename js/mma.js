@@ -5,9 +5,10 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127152720';
-import { Crowd } from './crowd.js?v=20261127152720';
-import { PrisonFX } from './prisonfx.js?v=20261127152720';
+import { makeHuman, animateHuman } from './entities.js?v=20261127155453';
+import { Crowd } from './crowd.js?v=20261127155453';
+import { loadFighterKit, Fighter } from './fighter.js?v=20261127155453';
+import { PrisonFX } from './prisonfx.js?v=20261127155453';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -21,7 +22,7 @@ const VOICE = { // hlášky hlasatelky (nahrané, hrají i na telefonu)
 };
 
 export class MMA {
-  constructor(game) { this.game = game; this.active = false; }
+  constructor(game) { this.game = game; this.active = false; loadFighterKit().then(() => (this.kitReady = true)).catch((e) => console.warn('zápasníci', e)); }
 
   /* ---------------- aréna ---------------- */
   build() {
@@ -54,7 +55,7 @@ export class MMA {
     const pad = mat('#0e0e0e', { roughness: 0.45 }), padRed = mat('#a01818', { roughness: 0.45 }), padBlue = mat('#1a3fa0', { roughness: 0.45 });
     const H = 1.8, top = this.deckTop;
     // vrcholy osmiúhelníku (stejně jako CylinderGeometry: úhel 0 míří na +z)
-    this.verts = [];
+    this.verts = []; this.cage = [];
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; this.verts.push([C.x + Math.sin(a) * R, C.z + Math.cos(a) * R]); }
     let door = 0, bd = 9;
     for (let k = 0; k < 8; k++) {
@@ -71,8 +72,10 @@ export class MMA {
       pm.map.needsUpdate = true; pm.map.repeat.set(w / 0.35, H / 0.35);
       const panel = new THREE.Mesh(new THREE.PlaneGeometry(w, H), pm); panel.position.set(mx, top + H / 2, mz); panel.rotation.y = rot; g.add(panel);
       const rail = new THREE.Mesh(new THREE.BoxGeometry(L, 0.18, 0.22), pad); rail.position.set((ax + bx) / 2, top + H + 0.09, (az + bz) / 2); rail.rotation.y = rot; g.add(rail);
+      (this.cage ||= []).push({ meshes: [panel, rail], cx: (ax + bx) / 2, cz: (az + bz) / 2 });
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, H + 0.4, 10), k === 1 ? padBlue : k === 5 ? padRed : pad);
       post.position.set(ax, top + (H + 0.4) / 2, az); g.add(post);
+      this.cage.push({ meshes: [post], cx: ax, cz: az });
     }
     const [dax, daz] = this.verts[door], [dbx, dbz] = this.verts[(door + 1) % 8];
     const dmx = dax + (dbx - dax) * 0.27, dmz = daz + (dbz - daz) * 0.27, ux0 = dmx - C.x, uz0 = dmz - C.z, ul = Math.hypot(ux0, uz0);
@@ -173,35 +176,20 @@ export class MMA {
 
   /* ---------------- postavy ---------------- */
   fighter(opts, name, team) {
+    if (team) { // zápasník: figurína s klipy a dopočítanými pohyby (fighter.js)
+      const rig = new Fighter(this.game.scene, team, 1.82);
+      return { rig, m: rig.root, name, team, x: 0, z: 0, y: 0, h: 0, yOff: 0, hp: 100, st: 100, act: 'idle', actT: 0, move: null, cool: 0.5, combo: 0, comboT: 0, buf: null,
+        hitDone: false, landed: 0, downs: 0, block: false, path: null, pi: 0, delay: 0, ai: { t: 0, strafe: 1 }, spin: 0, bones: { fistR: rig.bones.hand_r } };
+    }
     const m = makeHuman({ ...opts, scale: 1.05, tint: false });
     this.game.scene.add(m);
-    // GLTFLoader odstraní z názvů kostí tečky (Fist.L → FistL)
     const bone = (n) => { const n2 = n.replace(/\./g, ''); let b = null; m.traverse((o) => { if (!b && (o.name === n || o.name === n2)) b = o; }); return b; };
-    // MMA rukavice na obou pěstech (bachaři modré, vězni červené, rozhodčí bez)
-    if (team) {
-      m.updateMatrixWorld(true);
-      const col = team === 'blue' ? '#1f4fc4' : '#c41f1f';
-      for (const n of ['Fist.L', 'Fist.R']) {
-        const b = bone(n); if (!b) continue;
-        const ws = new THREE.Vector3(); b.getWorldScale(ws); const k = 1 / (ws.x || 1);
-        const glove = new THREE.Group();
-        const pad = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), new THREE.MeshStandardMaterial({ color: col, roughness: 0.45 }));
-        pad.scale.set(1, 0.9, 1.15);
-        const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.06, 10), new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.6 }));
-        cuff.position.y = -0.06;
-        glove.add(pad, cuff); glove.scale.setScalar(k);
-        b.add(glove);
-      }
-    }
-    return {
-      m, name, team, x: 0, z: 0, y: 0, h: 0, hp: 100, act: 'idle', actT: 0, cool: 1, hitDone: false, landed: 0, kickN: 0,
-      bones: { ulR: bone('UpperLeg.R'), llR: bone('LowerLeg.R'), uaL: bone('UpperArm.L'), uaR: bone('UpperArm.R'), torso: bone('Torso'), fistR: bone('Fist.R') },
-      strafe: Math.random() < 0.5 ? 1 : -1, strafeT: 0, block: false, path: null, pi: 0, delay: 0,
-    };
+    return { m, name, team, x: 0, z: 0, y: 0, h: 0, hp: 100, act: 'idle', actT: 0, bones: { uaL: bone('UpperArm.L'), uaR: bone('UpperArm.R') }, path: null, pi: 0, delay: 0 };
   }
 
   /** mode: 'watch' | 'play' (1 na 1, hráč = vězeň) | 'team' (3 na 3) | 'teamPlay' (3 na 3, hráč = vězeň) */
   start(mode = 'watch') {
+    if (!this.kitReady) { this.game.toast?.('Načítám zápasníky…'); loadFighterKit().then(() => { this.kitReady = true; this.start(mode); }); return; }
     if (this.active) {
       const wantTeam = mode === 'team' || mode === 'teamPlay', play = mode === 'play' || mode === 'teamPlay';
       if (play && wantTeam === this.team && !this.playAs) { this.takeOver(); return; }
@@ -240,7 +228,8 @@ export class MMA {
     this.phase = 'walkBlue'; this.t = 0; this.round = 0; this.clock = ROUND_S;
     this.makeHud();
     this.say(this.team ? 'intro3' : 'intro', this.team ? 'Vítejte na Vinařice Fight Night! Tři na tři! V modrém rohu… tým bachařů!' : 'Vítejte na Vinařice Fight Night! V modrém rohu… bachař Novák!');
-    G.toast?.(this.playAs ? '🥊 Hraješ za vězně · WASD · myš / F rána · G / Q kop · Shift kryt · O nůž' : '🥊 MMA zápas za tmy · V = kamera arény / pohled ze hry');
+    G.toast?.(this.playAs ? this.controlsText() : '🥊 Zápas za tmy · V = kamera arény / pohled ze hry');
+    this.timeScale = 1; this.hitStop = 0; this.slowMo = 0;
     this.knife = null;
   }
 
@@ -261,6 +250,7 @@ export class MMA {
 #mma-hud .row{display:flex;align-items:center;gap:8px}#mma-hud .bar{flex:1;height:16px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.35);border-radius:4px;overflow:hidden;display:flex}
 #mma-hud .bar i{display:block;height:100%;transition:width .15s}#mma-hud .b i{background:linear-gradient(90deg,#2b5fd8,#79a8ff)}#mma-hud .r{justify-content:flex-end}#mma-hud .r i{background:linear-gradient(270deg,#d82b2b,#ff8a7a)}
 #mma-hud .mid{min-width:96px;background:rgba(0,0,0,.75);border-radius:6px;padding:3px 6px;font-size:12px}#mma-hud .nm{display:flex;justify-content:space-between;margin-top:3px;text-shadow:0 1px 3px #000;font-size:12px}
+#mma-hud .st2{margin-top:3px}#mma-hud .sbar{flex:1;height:5px;background:rgba(0,0,0,.6);border-radius:3px;overflow:hidden;display:flex}#mma-hud .sbar.r{justify-content:flex-end}#mma-hud .sbar i{display:block;height:100%;background:#ffd84a;transition:width .1s}
 #mma-hud .st{margin-top:6px;background:rgba(0,0,0,.65);display:inline-block;padding:4px 10px;border-radius:8px;font-size:13px;max-width:94vw}
 #mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}
 @media (pointer:coarse),(max-width:700px){
@@ -271,7 +261,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     document.head.appendChild(css);
     document.body.classList.add('mma-on');
     const d = document.createElement('div'); d.id = 'mma-hud';
-    d.innerHTML = '<div class="row"><div class="bar b"><i id="mma-b"></i></div><div class="mid" id="mma-mid"></div><div class="bar r"><i id="mma-r"></i></div></div><div class="nm"><span id="mma-bn"></span><span id="mma-rn"></span></div><div class="st" id="mma-st"></div>';
+    d.innerHTML = '<div class="row"><div class="bar b"><i id="mma-b"></i></div><div class="mid" id="mma-mid"></div><div class="bar r"><i id="mma-r"></i></div></div><div class="row st2"><div class="sbar"><i id="mma-bs"></i></div><div style="min-width:96px"></div><div class="sbar r"><i id="mma-rs"></i></div></div><div class="nm"><span id="mma-bn"></span><span id="mma-rn"></span></div><div class="st" id="mma-st"></div>';
     document.body.appendChild(d); this.hud = d;
     const b = document.createElement('button'); b.id = 'mma-end'; b.textContent = '✕ Ukončit zápas';
     b.addEventListener('click', (e) => { e.stopPropagation(); this.finish(); });
@@ -299,8 +289,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     G.mode = 'mma'; G.player.mesh.visible = false;
     this.cinematic = true; this.camP = null;
     this.camBtn?.remove(); this.camBtn = null; this.playBtn?.remove(); this.playBtn = null;
-    G.toast?.('🥊 Hraješ za vězně · WASD · myš / F rána · G / Q kop · Shift kryt · O nůž');
+    G.toast?.(this.controlsText());
   }
+  controlsText() { return '🥊 A/D pohyb · W skok · S kryt · F pěst (kombo) · G kop (+S nízký, +W výskokový) · Q salto (+vpřed salto kop) · O nůž'; }
   toggleCam() {
     this.cinematic = !this.cinematic;
     if (this.camBtn) this.camBtn.textContent = this.cinematic ? '🎮 Pohled ze hry (V)' : '🎥 Kamera arény (V)';
@@ -311,6 +302,8 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     const $ = (id) => document.getElementById(id);
     if (!this.hud || !$('mma-b')) return;
     $('mma-b').style.width = `${this.teamHp(this.blue)}%`; $('mma-r').style.width = `${this.teamHp(this.red)}%`;
+    const tst = (L) => L.reduce((s2, f) => s2 + (f.st ?? 100), 0) / L.length;
+    $('mma-bs').style.width = `${tst(this.blue)}%`; $('mma-rs').style.width = `${tst(this.red)}%`;
     $('mma-bn').textContent = `🔵 ${this.team ? 'Bachaři' : this.blue[0].name} ${Math.round(this.teamHp(this.blue))}`;
     $('mma-rn').textContent = `${Math.round(this.teamHp(this.red))} ${this.team ? (this.playAs ? 'Vězni (TY)' : 'Vězni') : this.red[0].name}${this.knife ? ' 🔪' : ''} 🔴`;
     const s = Math.max(0, Math.ceil(this.clock));
@@ -322,6 +315,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
   update(dt) {
     if (!this.active) return;
     if (!this.playAs && this.game.input.hit('KeyV')) this.toggleCam();
+    // zpomalení při K.O. a krátké zastavení při silném zásahu
+    if (this.slowMo > 0) { this.slowMo -= dt; dt *= 0.3; }
+    if (this.hitStop > 0) { this.hitStop -= dt; dt *= 0.08; }
     this.t += dt;
     const ph = this.phase;
     if (ph === 'walkBlue' || ph === 'walkRed') {
@@ -352,12 +348,13 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       }
     } else if (ph === 'rest') {
       for (const f of this.all) {
-        if (f.act === 'ko') { this.updateAnim(f, dt); continue; }
+        if (f.act === 'ko') { this.place3(f); this.animF(f, dt); continue; }
+        f.act = 'idle'; f.block = false;
         this.stepTo(f, f.corner[0], f.corner[1], 1.6, dt); f.hp = Math.min(100, f.hp + dt * 0.8);
       }
       if (this.t > REST_S) this.startRound(this.round + 1);
     } else if (ph === 'end') {
-      for (const f of this.all) { if (f.act === 'ko') this.updateAnim(f, dt); else if (f.team === this.winTeam) this.idle(f, dt, true); else this.idle(f, dt); }
+      for (const f of this.all) { f.yOff = 0; f.spin = 0; this.place3(f); if (f.act === 'ko') this.animF(f, dt); else if (f.team === this.winTeam) this.idle(f, dt, true); else { f.act = 'idle'; this.idle(f, dt); } }
       if (this.t > 16) this.finish();
     }
     this.refStep(dt);
@@ -368,8 +365,10 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
 
   startRound(n) {
     this.round = n; this.clock = ROUND_S; this.phase = 'fight'; this.t = 0;
-    for (const f of this.all) if (f.act !== 'ko') { f.act = 'idle'; f.cool = 0.6 + Math.random() * 0.8; }
+    for (const f of this.all) if (f.act !== 'ko') { f.act = 'idle'; f.move = null; f.yOff = 0; f.spin = 0; f.cool = 0.9 + Math.random() * 0.6; f.st = 100; f.downs = 0; }
     this.say(`r${n}`, n === 3 ? 'Třetí a poslední kolo!' : `${n}. kolo!`); this.bell(1);
+    this.flash(`KOLO ${n}`, '#ffffff', null, true);
+    setTimeout(() => { if (this.active && this.phase === 'fight') this.flash('FIGHT!', '#39ff14', null, true); }, 1300);
   }
   bell(times) { for (let k = 0; k < times; k++) setTimeout(() => this.game.audio?.blip?.(1250, 0.6, 'sine', 0.12, -20), k * 260); }
   alive(list) { return list.filter((f) => f.act !== 'ko'); }
@@ -394,20 +393,19 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     const gy = this.game.city.ground(f.x, f.z);
     if (f.pi === 0) f.y = gy; else if (f.pi === 1) { const t = 1 - Math.hypot(this.stairTop[0] - f.x, this.stairTop[1] - f.z) / 1.9; f.y = gy + DECK * Math.max(0, Math.min(1, t)); } else f.y = this.deckTop;
     f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = f.h;
-    animateHuman(f.m, v, dt); this.applyPose(f, true);
+    this.animF(f, dt, v);
     return false;
   }
   idle(f, dt, celebrate = false) {
     f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = f.h;
-    if (celebrate) { f.act = 'win'; animateHuman(f.m, 0, dt, Math.sin(this.t * 4 + f.x) > 0.4 ? 'air' : null); }
-    else animateHuman(f.m, 0, dt);
-    this.applyPose(f, this.phase === 'walkBlue' || this.phase === 'walkRed');
+    if (celebrate) f.act = 'win';
+    this.animF(f, dt, 0);
   }
   stepTo(f, tx, tz, v, dt) {
     const dx = tx - f.x, dz = tz - f.z, d = Math.hypot(dx, dz);
     if (d > 0.1) { const s = Math.min(d, v * dt); f.x += (dx / d) * s; f.z += (dz / d) * s; f.h = Math.atan2(dx, dz); }
     f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = f.h;
-    animateHuman(f.m, d > 0.1 ? v : 0, dt); this.applyPose(f, false);
+    this.animF(f, dt, d > 0.1 ? v : 0);
   }
   keepIn(f) {
     const dx = f.x - C.x, dz = f.z - C.z, d = Math.hypot(dx, dz), lim = R * Math.cos(Math.PI / 8) - 0.55;
@@ -421,81 +419,220 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     }
   }
 
-  /** Jeden zápasník: AI nebo hráč. */
+  /* ================= bojový systém (pohled z boku, jako bojovky) ================= */
+  /**
+   * Tahy: clip = klip figuríny, pose = dopočítaný pohyb, dur = délka, imp = okamžik zásahu,
+   * reach = dosah, dmg = poškození, st = výdrž, lvl = výška (low se nedá krýt horním krytem),
+   * push = odhození, air = výskok (výška, posun), flip = salto (otočky, směr), kd = šance na knockdown.
+   */
+  static MOVES = {
+    jab: { clip: 'Punch_Jab', speed: 1.7, dur: 0.34, imp: 0.13, reach: 1.25, dmg: 4, st: 5, lvl: 'high', push: 0.15 },
+    cross: { clip: 'Punch_Cross', speed: 1.6, dur: 0.42, imp: 0.18, reach: 1.3, dmg: 7, st: 8, lvl: 'high', push: 0.25 },
+    hook: { pose: 'hook', dur: 0.45, imp: 0.22, reach: 1.15, dmg: 9, st: 11, lvl: 'high', push: 0.35, kd: 0.08 },
+    uppercut: { clip: 'Punch_Cross', speed: 1.2, pose: 'uppercut', dur: 0.5, imp: 0.24, reach: 1.05, dmg: 11, st: 13, lvl: 'high', push: 0.5, kd: 0.25, lift: 0.35 },
+    lowKick: { pose: 'lowKick', dur: 0.48, imp: 0.24, reach: 1.45, dmg: 6, st: 9, lvl: 'low', push: 0.15 },
+    frontKick: { pose: 'frontKick', dur: 0.55, imp: 0.27, reach: 1.6, dmg: 8, st: 12, lvl: 'mid', push: 1.1 },
+    highKick: { pose: 'highKick', dur: 0.68, imp: 0.34, reach: 1.7, dmg: 13, st: 17, lvl: 'high', push: 0.6, kd: 0.3 },
+    jumpKick: { clip: 'Jump_Loop', pose: 'jumpKick', dur: 0.8, imp: 0.42, reach: 1.55, dmg: 15, st: 20, lvl: 'high', push: 1.0, kd: 0.45, air: [1.1, 2.4] },
+    flipKick: { clip: 'Jump_Loop', pose: 'tuck', dur: 0.9, imp: 0.72, reach: 1.5, dmg: 18, st: 24, lvl: 'high', push: 1.2, kd: 0.6, air: [1.5, 1.8], flip: 1 },
+    jump: { clip: 'Jump_Loop', dur: 0.7, imp: 9, reach: 0, dmg: 0, st: 4, air: [1.0, 0.6] },
+    salto: { clip: 'Jump_Loop', pose: 'tuck', dur: 0.85, imp: 9, reach: 0, dmg: 0, st: 12, air: [1.5, -2.2], flip: -1, dodge: true },
+    roll: { clip: 'Roll', speed: 1.4, dur: 0.6, imp: 9, reach: 0, dmg: 0, st: 8, slide: -2.0, dodge: true },
+    stab: { clip: 'Punch_Jab', speed: 1.5, dur: 0.38, imp: 0.15, reach: 1.25, dmg: 16, st: 6, lvl: 'mid', push: 0.2, blood: 1 },
+  };
+  static COMBO = ['jab', 'cross', 'hook', 'uppercut'];
+
+  /** Animace figuríny / rozhodčího podle stavu. */
+  animF(f, dt, speed = 0) {
+    if (!f.rig) { animateHuman(f.m, speed, dt); return; }
+    const R = f.rig, walking = this.phase === 'walkBlue' || this.phase === 'walkRed';
+    const M = f.move ? MMA.MOVES[f.move] : null;
+    if (f.act === 'ko') R.play('Death01', 0.12, 1.2);
+    else if (f.act === 'down') R.play('Death01', 0.12, f.actT < 1.6 ? 1.4 : -1.2); // pád a zvednutí (klip pozpátku)
+    else if (f.act === 'hit') R.play(f.hitHigh ? 'Hit_Head' : 'Hit_Chest', 0.06, 1.6);
+    else if (f.act === 'win') R.play('Dance_Loop', 0.3);
+    else if (f.act === 'attack' && M?.clip) R.play(M.clip, 0.05, M.speed || 1);
+    else if (Math.abs(speed) > 2.2) R.play('Jog_Fwd_Loop', 0.15, Math.abs(speed) / 3);
+    else if (Math.abs(speed) > 0.15) R.play('Walk_Loop', 0.15, Math.max(0.8, Math.abs(speed) / 1.3) * Math.sign(speed || 1));
+    else R.play('Idle_Loop', 0.2);
+    R.update(dt);
+    // dopočítané pózy po klipu
+    if (f.act === 'attack' && M?.pose) R.pose(M.pose, f.actT / M.dur);
+    else if (f.act === 'win') R.pose('win', Math.min(1, this.t));
+    else if (f.block) R.pose('block', 1);
+    else if (!walking && f.act !== 'ko' && f.act !== 'down' && f.act !== 'hit') R.pose('guard', 1);
+  }
+
+  /** Jeden zápasník za snímek: hráč nebo AI. */
   fightStep(f, dt) {
-    if (f.act === 'ko') { this.updateAnim(f, dt); return; }
+    f.actT += dt; f.cool -= dt; f.comboT -= dt;
+    if (f.act === 'ko') { this.place3(f); this.animF(f, dt); return; }
     const o = this.nearestFoe(f);
-    f.cool -= dt; f.actT += dt;
-    if (!o) { this.idle(f, dt); return; }
-    const dx = o.x - f.x, dz = o.z - f.z, d = Math.hypot(dx, dz) || 0.01, face = Math.atan2(dx, dz);
-    let mv = 0, mx = 0, mz = 0;
-    if (f.act === 'hit') { if (f.actT > 0.38) f.act = 'idle'; }
-    else if (f.act === 'punch' || f.act === 'kick' || f.act === 'stab') {
-      const impact = f.act === 'kick' ? 0.3 : 0.17, end = f.act === 'kick' ? 0.62 : 0.42, reach = f.act === 'kick' ? 1.7 : f.act === 'stab' ? 1.3 : 1.35;
-      if (!f.hitDone && f.actT >= impact) { f.hitDone = true; this.resolve(f, o, f.act, reach); }
-      if (f.actT > end) f.act = 'idle';
+    // výdrž se doplňuje (rychleji, když neútočí)
+    f.st = Math.min(100, f.st + dt * (f.act === 'attack' ? 4 : f.block ? 9 : 16));
+    if (f.act === 'down') {
+      if (f.actT > 2.6) { f.act = 'idle'; f.actT = 0; f.cool = 0.4; }
+      this.place3(f); this.animF(f, dt); return;
+    }
+    if (!o) { f.act = 'win'; this.place3(f); this.animF(f, dt); return; }
+    const dx = o.x - f.x, dz = o.z - f.z, d = Math.hypot(dx, dz) || 0.01, ux = dx / d, uz = dz / d;
+    const face = Math.atan2(dx, dz);
+    let mv = 0; // rychlost k soupeři (+) / od soupeře (−)
+    // probíhající tah
+    if (f.act === 'hit' && f.actT > 0.42) { f.act = 'idle'; f.actT = 0; }
+    if (f.act === 'attack') {
+      const M = MMA.MOVES[f.move], t = f.actT;
+      if (M.air) { // výskok: oblouk a posun
+        const p = Math.min(1, t / M.dur);
+        f.yOff = Math.sin(p * Math.PI) * M.air[0];
+        const step = (M.air[1] / M.dur) * dt; f.x += ux * step; f.z += uz * step;
+        f.spin = M.flip ? M.flip * p * Math.PI * 2 : 0;
+      }
+      if (M.slide) { const step = (M.slide / M.dur) * dt; f.x += ux * step; f.z += uz * step; }
+      if (!f.hitDone && t >= M.imp) { f.hitDone = true; this.resolve(f, o, f.move); }
+      if (t >= M.dur) {
+        f.act = 'idle'; f.actT = 0; f.yOff = 0; f.spin = 0;
+        if (f.buf) { const b = f.buf; f.buf = null; this.startMove(f, b); }
+      }
     }
     const free = f.act === 'idle';
-    if (f === this.me) {
-      const inp = this.game.input, a = inp.axes();
-      const cy = this.camYawNow ?? face, fx = Math.sin(cy), fz = Math.cos(cy), rx = -Math.cos(cy), rz = Math.sin(cy);
-      mx = fx * a.y + rx * a.x; mz = fz * a.y + rz * a.x; mv = Math.min(1, Math.hypot(mx, mz)) * 2.5;
-      f.block = inp.down('ShiftLeft', 'ShiftRight');
-      if (inp.hit('KeyO') && !this.knife) this.drawKnife(f);
-      if (free && f.cool <= 0 && !f.block) {
-        if (inp.hit('Mouse0') || inp.hit('KeyF') || inp.hit('KeyK')) this.attack(f, this.knife ? 'stab' : 'punch', 0.36);
-        else if (inp.hit('KeyG') || inp.hit('KeyQ') || inp.hit('Mouse2')) this.attack(f, 'kick', 0.7);
-      }
-    } else if (free) {
-      f.strafeT -= dt; if (f.strafeT <= 0) { f.strafe = Math.random() < 0.5 ? 1 : -1; f.strafeT = 0.8 + Math.random() * 1.5; }
-      const want = 1.25, ux = dx / d, uz = dz / d;
-      const fwd = d > want + 0.25 ? 1 : d < want - 0.35 ? -0.6 : 0;
-      mx = ux * fwd - uz * f.strafe * 0.55; mz = uz * fwd + ux * f.strafe * 0.55;
-      mv = Math.min(1, Math.hypot(mx, mz)) * (fwd > 0 ? 2.0 : 1.3);
-      f.block = (o.act === 'punch' || o.act === 'kick' || o.act === 'stab') && (f.block || Math.random() < 0.04);
-      if (f.cool <= 0 && d < 1.85) {
-        if (d < 1.4 && Math.random() < 0.6) this.attack(f, 'punch', 0.5 + Math.random() * 0.6);
-        else this.attack(f, 'kick', 0.85 + Math.random() * 0.7);
+    if (f === this.me) mv = this.playerInput(f, o, d, free, dt);
+    else if (free || f.act === 'hit') mv = this.aiStep(f, o, d, free, dt);
+    if (f.act === 'idle' || f.act === 'hit') {
+      const sp = f.block ? mv * 0.45 : mv;
+      f.x += ux * sp * dt; f.z += uz * sp * dt;
+    }
+    f.h += Math.atan2(Math.sin(face - f.h), Math.cos(face - f.h)) * Math.min(1, dt * 12);
+    this.place3(f);
+    this.animF(f, dt, f.act === 'idle' ? mv : 0);
+  }
+  place3(f) {
+    f.m.position.set(f.x, f.y + (f.yOff || 0), f.z);
+    f.m.rotation.set(0, f.h, 0);
+    if (f.spin) { f.m.rotateX(f.spin); }
+  }
+  /** Zahájí tah (kontrola výdrže; při nízké výdrži slabší a pomalejší). */
+  startMove(f, kind) {
+    const M = MMA.MOVES[kind]; if (!M) return;
+    f.weak = f.st < M.st;
+    f.st = Math.max(0, f.st - M.st);
+    f.move = kind; f.act = 'attack'; f.actT = 0; f.hitDone = false; f.block = false;
+    f.cool = M.dur * (f.weak ? 1.25 : 1);
+    if (M.clip) f.rig.play(M.clip, 0.05, M.speed || 1, true);
+    if (M.air || M.flip) this.game.audio?.noise?.(0.12, 0.2, 900);
+    else this.game.audio?.noise?.(0.05, 0.12, 1900);
+  }
+  /** Ovládání hráče (pohled z boku): A/D = vlevo/vpravo na obrazovce, W skok, S kryt, F pěst, G kop, Q salto, O nůž. */
+  playerInput(f, o, d, free, dt) {
+    const inp = this.game.input, a = inp.axes();
+    // směr „k soupeři“ na obrazovce: soupeř je vpravo, když kamera vidí osu zleva doprava
+    const sr = this.screenRight || { x: 1, z: 0 }, toward = Math.sign(((o.x - f.x) * sr.x + (o.z - f.z) * sr.z) || 1);
+    const horiz = a.x * toward; // + = k soupeři
+    const up = inp.down('KeyW', 'ArrowUp', 'Space') || a.y > 0.6, down = inp.down('KeyS', 'ArrowDown', 'ShiftLeft', 'ShiftRight') || a.y < -0.6;
+    f.block = free && down && !inp.down('KeyG', 'KeyK');
+    if (inp.hit('KeyO') && !this.knife) this.drawKnife(f);
+    const punch = inp.hit('Mouse0') || inp.hit('KeyF') || inp.hit('KeyJ'), kick = inp.hit('KeyG') || inp.hit('KeyK') || inp.hit('Mouse2'), special = inp.hit('KeyQ') || inp.hit('KeyL');
+    let want = null;
+    if (punch) { if (this.knife) want = 'stab'; else { f.combo = f.comboT > 0 ? (f.combo + 1) % MMA.COMBO.length : 0; want = MMA.COMBO[f.combo]; f.comboT = 0.9; } }
+    else if (kick) want = up ? 'jumpKick' : down ? 'lowKick' : horiz > 0.3 ? 'frontKick' : 'highKick';
+    else if (special) want = horiz > 0.3 ? 'flipKick' : 'salto';
+    else if (inp.hit('KeyW') || inp.hit('ArrowUp') || inp.hit('Space')) want = 'jump';
+    // kop ve skoku = výskokový kop
+    if (kick && f.act === 'attack' && f.move === 'jump') { f.move = 'jumpKick'; f.hitDone = false; f.actT = Math.min(f.actT, 0.3); return 0; }
+    if (want) { if (free && f.cool <= 0) this.startMove(f, want); else if (f.act === 'attack' && !MMA.MOVES[f.move].air) f.buf = want; }
+    return horiz * (Math.abs(horiz) > 0.1 ? 2.6 : 0);
+  }
+  /** AI: drží vzdálenost, útočí kombinacemi, kryje se, uhýbá saltem, občas výskokový kop. */
+  aiStep(f, o, d, free, dt) {
+    const A = f.ai, lvl = this.playAs ? 0.75 : 1; // proti hráči o chlup mírnější
+    A.t -= dt;
+    // reakce na útok soupeře: kryt / salto
+    const threat = o.act === 'attack' && !o.hitDone && MMA.MOVES[o.move]?.dmg > 0 && d < 2.2;
+    if (threat && free) {
+      if (A.react == null) A.react = Math.random();
+      if (A.react < 0.42 * lvl) f.block = true;
+      else if (A.react > 0.93 && f.st > 20) { this.startMove(f, 'salto'); A.react = null; return 0; }
+    } else { A.react = null; if (f.block && Math.random() < dt * 4) f.block = false; }
+    if (!free || f.block) return d > 1.4 ? 0.8 : 0;
+    // plán: přiblížit / držet / ustoupit
+    if (A.t <= 0) { A.t = 0.6 + Math.random() * 1.2; A.strafe = Math.random() < 0.3 ? -1 : 1; }
+    const tired = f.st < 25;
+    let mv = 0;
+    if (tired) mv = d < 2.2 ? -1.6 : 0; // vydýchat se
+    else if (d > 1.45) mv = d > 3 ? 2.6 : 1.8;
+    else if (d < 0.95) mv = -1.4;
+    else mv = Math.sin(this.game.time * 2 + f.x) * 0.6 * A.strafe;
+    if (f.cool <= 0 && !tired) {
+      const r = Math.random();
+      if (d > 2.0 && d < 3.0 && r < 0.03) this.startMove(f, 'jumpKick');
+      else if (d < 1.5 && r < 0.04 * lvl + 0.02) {
+        const pick = Math.random();
+        if (pick < 0.45) { f.combo = 0; this.startMove(f, 'jab'); if (Math.random() < 0.7) f.buf = Math.random() < 0.6 ? 'cross' : 'hook'; }
+        else if (pick < 0.6) this.startMove(f, 'lowKick');
+        else if (pick < 0.75) this.startMove(f, 'highKick');
+        else if (pick < 0.85) this.startMove(f, 'uppercut');
+        else if (pick < 0.93) this.startMove(f, 'frontKick');
+        else this.startMove(f, 'flipKick');
       }
     }
-    if (mv > 0.05 && f.act !== 'hit') {
-      const l = Math.hypot(mx, mz) || 1, sp = f.block ? mv * 0.5 : mv;
-      f.x += (mx / l) * sp * dt; f.z += (mz / l) * sp * dt;
-    }
-    f.h += Math.atan2(Math.sin(face - f.h), Math.cos(face - f.h)) * Math.min(1, dt * 10);
-    f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = f.h;
-    this.updateAnim(f, dt, mv);
+    return mv;
   }
-  attack(f, kind, cool) {
-    f.act = kind; f.actT = 0; f.hitDone = false; f.cool = cool;
-    if (kind !== 'kick') f.m.userData.punchNew = true; else f.kickN++;
-    this.game.audio?.noise?.(0.05, 0.12, 1800);
-  }
-  resolve(f, o, kind, reach) {
+  /** Vyhodnocení zásahu: dosah, směr, kryt (nízký kop krytem neprojde), salto = úhyb. */
+  resolve(f, o, kind) {
+    const M = MMA.MOVES[kind];
+    if (!M.dmg || o.act === 'ko' || o.act === 'down') return;
     const dx = o.x - f.x, dz = o.z - f.z, d = Math.hypot(dx, dz);
-    const facing = Math.cos(Math.atan2(dx, dz) - f.h) > 0.55;
-    if (d > reach || !facing || o.act === 'ko') return;
-    let chance = kind === 'kick' ? 0.6 : kind === 'stab' ? 0.85 : 0.7;
-    if (o.block && kind !== 'stab') chance *= 0.3;
-    if (Math.random() > chance) { this.game.audio?.noise?.(0.05, 0.1, 1400); return; }
-    let dmg = kind === 'punch' ? 4 + Math.random() * 4 : kind === 'kick' ? 6 + Math.random() * 6 : 14 + Math.random() * 8;
-    if (f === this.me) dmg *= 1.15; if (o === this.me) dmg *= 0.85; // hráč je trochu silnější
-    if (o.block && kind !== 'stab') dmg *= 0.35;
+    const facing = Math.cos(Math.atan2(dx, dz) - f.h) > 0.5;
+    const dodging = o.act === 'attack' && MMA.MOVES[o.move]?.dodge;
+    if (d > M.reach || !facing || dodging) { this.game.audio?.noise?.(0.05, 0.1, 1400); return; }
+    const blocked = o.block && M.lvl !== 'low' && kind !== 'stab';
+    let dmg = M.dmg * (0.85 + Math.random() * 0.3) * (f.weak ? 0.55 : 1);
+    if (f === this.me) dmg *= 1.15; if (o === this.me) dmg *= 0.85; // hráč je o chlup silnější
+    const ux = dx / (d || 1), uz = dz / (d || 1), G = this.game;
+    if (blocked) {
+      dmg *= 0.15; o.st = Math.max(0, o.st - M.st * 0.6);
+      o.x += ux * M.push * 0.4; o.z += uz * M.push * 0.4;
+      G.audio?.noise?.(0.06, 0.4, 700);
+      o.hp -= dmg;
+      this.flash('KRYT', '#7fd3ff', o);
+      if (o.hp <= 0) this.ko(f, o);
+      return;
+    }
     o.hp -= dmg; f.landed++;
-    o.act = 'hit'; o.actT = 0;
-    const ux = dx / (d || 1), uz = dz / (d || 1);
-    o.x += ux * (kind === 'kick' ? 0.45 : 0.28); o.z += uz * (kind === 'kick' ? 0.45 : 0.28);
-    const G = this.game;
-    G.audio?.noise?.(0.08, kind === 'kick' ? 0.9 : 0.7, kind === 'kick' ? 260 : 340);
-    G.audio?.blip?.(80, 0.08, 'square', 0.1, -30);
-    // krev: při úderech občas, při noži vždy (kapky + louže na plachtě)
-    if (kind === 'stab' || Math.random() < 0.45) {
-      G.weapons?.bleed(new THREE.Vector3(o.x, o.y + (kind === 'kick' ? 1.2 : 1.55), o.z), new THREE.Vector3(ux, 0, uz), kind === 'stab' ? 14 : 4);
-      if (kind === 'stab' || Math.random() < 0.3) this.bloodPool(o.x + ux * 0.3, o.z + uz * 0.3, kind === 'stab' ? 0.55 : 0.3);
+    o.act = 'hit'; o.actT = 0; o.move = null; o.buf = null; o.hitHigh = M.lvl === 'high'; o.yOff = 0; o.spin = 0; o.block = false;
+    o.x += ux * M.push; o.z += uz * M.push;
+    // zvuk, otřes, krátké zastavení (hit-stop), krev
+    G.audio?.noise?.(0.09, M.dmg > 10 ? 1.0 : 0.75, M.dmg > 10 ? 220 : 330);
+    G.audio?.blip?.(70, 0.09, 'square', 0.12, -30);
+    this.hitStop = M.dmg >= 11 ? 0.11 : 0.05;
+    this.shake = Math.max(this.shake || 0, M.dmg / 40);
+    if (M.blood || Math.random() < 0.35 + M.dmg / 40) {
+      G.weapons?.bleed(new THREE.Vector3(o.x, o.y + (M.lvl === 'low' ? 0.6 : M.lvl === 'mid' ? 1.15 : 1.6), o.z), new THREE.Vector3(ux, 0, uz), M.blood ? 14 : 4 + M.dmg / 3);
+      if (M.blood || Math.random() < 0.25) this.bloodPool(o.x + ux * 0.3, o.z + uz * 0.3, M.blood ? 0.55 : 0.3);
     }
     if (kind === 'stab') this.status = '🔪 Vězeň podvádí! Nůž v kleci!';
     this.hype = 1;
-    if (o.hp <= 0) this.ko(f, o);
+    if (M.dmg >= 13) this.flash(kind === 'flipKick' ? 'SALTO KOP!' : kind === 'jumpKick' ? 'VÝSKOKOVÝ KOP!' : 'ZÁSAH!', '#ffe14a', o);
+    if (o.hp <= 0) { this.ko(f, o); return; }
+    // knockdown: silná rána na unaveného / zraněného
+    if (M.kd && Math.random() < M.kd * (o.hp < 40 ? 1.6 : 0.6)) {
+      o.act = 'down'; o.actT = 0; o.downs++;
+      this.flash('KNOCKDOWN!', '#ff5a3a', o);
+      G.audio?.crash?.(12);
+      if (o.downs >= 3) { o.hp = 0; this.ko(f, o, 'TKO'); }
+    }
+  }
+  /** Velký nápis přes obrazovku (KOLO, FIGHT, K.O., ZÁSAH…). */
+  flash(text, color = '#fff', who = null, big = false) {
+    let el = document.getElementById('mma-flash');
+    if (!el) {
+      el = document.createElement('div'); el.id = 'mma-flash';
+      el.style.cssText = 'position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:42;pointer-events:none;font:400 64px "Bungee",sans-serif;text-align:center;text-shadow:0 4px 0 #000,0 0 24px rgba(0,0,0,.6);white-space:nowrap';
+      document.body.appendChild(el);
+    }
+    if (!big && who && who !== this.me && this.me && who.team === this.me.team) return; // drobné nápisy jen u hráčova soupeře
+    el.textContent = text; el.style.color = color; el.style.fontSize = big ? 'min(14vw,120px)' : 'min(9vw,54px)';
+    el.animate([{ opacity: 0, transform: 'translate(-50%,-50%) scale(2.2)' }, { opacity: 1, transform: 'translate(-50%,-50%) scale(1)', offset: 0.18 }, { opacity: 1, offset: 0.75 }, { opacity: 0, transform: 'translate(-50%,-50%) scale(.9)' }], { duration: big ? 1600 : 900, easing: 'ease-out', fill: 'forwards' });
   }
   bloodPool(x, z, r) {
     this.poolM ||= new THREE.MeshBasicMaterial({ color: '#6a0a0a', transparent: true, opacity: 0.85, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -3 });
@@ -505,61 +642,44 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
   }
   drawKnife(f) {
     const k = new THREE.Group();
-    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.24), new THREE.MeshStandardMaterial({ color: '#d9dde0', metalness: 0.9, roughness: 0.2 }));
-    blade.position.z = 0.15;
+    const blade = new THREE.Mesh(new THREE.BoxGeometry(0.03, 0.02, 0.26), new THREE.MeshStandardMaterial({ color: '#d9dde0', metalness: 0.9, roughness: 0.2 }));
+    blade.position.z = 0.16;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.035, 0.11), new THREE.MeshStandardMaterial({ color: '#222' }));
     k.add(blade, handle);
-    if (f.bones.fistR) { f.m.updateMatrixWorld(true); const ws = new THREE.Vector3(); f.bones.fistR.getWorldScale(ws); const sc = 1 / (ws.x || 1); f.bones.fistR.add(k); k.scale.setScalar(sc); k.position.set(0, 0.05 * sc, 0); }
+    const hb = f.rig?.bones.hand_r;
+    if (hb) { f.m.updateMatrixWorld(true); const ws = new THREE.Vector3(); hb.getWorldScale(ws); const sc = 1 / (ws.x || 1); hb.add(k); k.scale.setScalar(sc); }
     else { k.position.set(0.3, 1.1, 0.3); f.m.add(k); }
     this.knife = k;
-    this.game.toast?.('🔪 Vytáhl jsi nůž! Myš / F = bodnout');
+    this.game.toast?.('🔪 Vytáhl jsi nůž! F = bodnout');
     this.say('knife', 'Sakra! On má nůž!');
     this.status = '🔪 Sakra, on má nůž!';
     this.hype = 1;
     this.game.prisonFx?.bark?.();
   }
-  updateKnife() { /* nůž je přichycený na pěsti, nic dalšího */ }
-  ko(w, l) {
-    l.hp = 0; l.act = 'ko'; l.actT = 0;
-    this.game.audio?.crash?.(15);
+  updateKnife() { /* nůž drží pravá ruka */ }
+  updateAnim(f, dt) { this.animF(f, dt); }
+  ko(w, l, kind = 'K.O.') {
+    l.hp = 0; l.act = 'ko'; l.actT = 0; l.yOff = 0; l.spin = 0; l.block = false;
+    this.game.audio?.crash?.(18);
+    this.slowMo = 1.6; // zpomalený záběr
     const foes = this.alive(l.team === 'blue' ? this.blue : this.red);
-    if (foes.length) { this.status = `${l.name} je K.O.!`; this.hype = 1; return; }
+    if (foes.length) { this.status = `${l.name} je ${kind}!`; this.flash(kind + '!', '#ff3b30', null, true); this.hype = 1; return; }
     this.winTeam = w.team; this.phase = 'end'; this.t = 0;
     const guards = w.team === 'blue';
-    this.say(guards ? 'ko_guard' : 'ko_con', `K.O.! Vítězí ${guards ? (this.team ? 'bachaři' : 'bachař Novák') : this.playAs ? 'TY – vězeň z oddílu K' : this.team ? 'vězni' : 'vězeň Kladivo'}!`);
+    this.say(guards ? 'ko_guard' : 'ko_con', `${kind}! Vítězí ${guards ? (this.team ? 'bachaři' : 'bachař Novák') : this.playAs ? 'TY – vězeň z oddílu K' : this.team ? 'vězni' : 'vězeň Kladivo'}!`);
     this.bell(3); this.hype = 1;
-    this.game.hud?.bigMsg?.('K.O.!', `Vítězí ${guards ? 'bachaři' : this.playAs ? 'TY' : 'vězni'} v ${this.round}. kole`);
+    this.flash(kind + '!', '#ff3b30', null, true);
+    this.game.hud?.bigMsg?.(kind + '!', `Vítězí ${guards ? 'bachaři' : this.playAs ? 'TY' : 'vězni'} v ${this.round}. kole`);
   }
   decision() {
     const sb = this.blue.reduce((s, f) => s + f.landed + Math.max(0, f.hp) * 0.05, 0), sr = this.red.reduce((s, f) => s + f.landed + Math.max(0, f.hp) * 0.05, 0);
     this.winTeam = sb >= sr ? 'blue' : 'red'; this.phase = 'end'; this.t = 0;
+    for (const f of this.all) if (f.act !== 'ko') { f.act = 'idle'; f.move = null; f.yOff = 0; f.spin = 0; }
     const guards = this.winTeam === 'blue';
     this.say(guards ? 'dec_guard' : 'dec_con', `Po třech kolech vítězí na body ${guards ? 'bachaři' : this.playAs ? 'TY' : 'vězni'}!`);
     this.bell(3);
+    this.flash('NA BODY', '#ffe14a', null, true);
     this.game.hud?.bigMsg?.('NA BODY', `Vítězí ${guards ? 'bachaři' : this.playAs ? 'TY' : 'vězni'}`);
-  }
-
-  updateAnim(f, dt, mv = 0) {
-    if (f.act === 'ko') { animateHuman(f.m, 0, dt, 'down'); return; }
-    if (f.act === 'punch' || f.act === 'stab') animateHuman(f.m, 0, dt, 'punch');
-    else animateHuman(f.m, mv, dt);
-    this.applyPose(f, false);
-  }
-  /** Garda, kopy, reakce na zásah, oslava – natočení kostí po přehrání klipu. */
-  applyPose(f, walking) {
-    const B = f.bones;
-    if (f === this.ref) return;
-    if (!walking && f.act !== 'punch' && f.act !== 'stab' && f.act !== 'win') {
-      if (B.uaL) { B.uaL.rotation.x -= 0.9; B.uaL.rotation.z += f.block ? 0.5 : 0.25; }
-      if (B.uaR) { B.uaR.rotation.x -= 0.9; B.uaR.rotation.z -= f.block ? 0.5 : 0.25; }
-    }
-    if (f.act === 'kick' && B.ulR) {
-      const k = Math.sin(Math.min(1, f.actT / 0.62) * Math.PI);
-      B.ulR.rotation.x -= k * 1.5; if (B.llR) B.llR.rotation.x += k * (f.kickN % 2 ? 0.2 : 0.9);
-      if (B.torso) B.torso.rotation.x += k * 0.25;
-    }
-    if (f.act === 'hit' && B.torso) B.torso.rotation.x += Math.sin(Math.min(1, f.actT / 0.38) * Math.PI) * 0.45;
-    if (f.act === 'win') { if (B.uaL) B.uaL.rotation.x -= 2.6; if (B.uaR) B.uaR.rotation.x -= 2.6; }
   }
 
   refStep(dt) {
@@ -569,8 +689,10 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       const L = this.alive(this.all);
       let mx = C.x, mz = C.z;
       if (L.length) { mx = L.reduce((s, f) => s + f.x, 0) / L.length; mz = L.reduce((s, f) => s + f.z, 0) / L.length; }
-      // drží se 2,3 m stranou od středu dění
-      let ax = r.x - mx, az = r.z - mz; const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
+      // drží se 2,3 m stranou od středu dění – na opačné straně než kamera (nezakrývá souboj)
+      let ax = r.x - mx, az = r.z - mz;
+      if (this.camP && (this.cinematic || this.playAs)) { ax = mx - this.camP.x; az = mz - this.camP.z; }
+      const al = Math.hypot(ax, az) || 1; ax /= al; az /= al;
       let tx = mx + ax * 2.3, tz = mz + az * 2.3;
       const lim = R - 1.0, ddx = tx - C.x, ddz = tz - C.z, dd = Math.hypot(ddx, ddz);
       if (dd > lim) { tx = C.x + (ddx / dd) * lim; tz = C.z + (ddz / dd) * lim; }
@@ -631,28 +753,51 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     this.colorLights.forEach((c, i) => { c.intensity = 10 + Math.sin(t * 4 + i * 3) * 8 + this.hype * 10; c.position.x = C.x + Math.cos(t * 0.8 + i * Math.PI) * 6; c.position.z = C.z + Math.sin(t * 0.8 + i * Math.PI) * 6; });
   }
 
-  /** Kamera: při sledování krouží kolem klece / jde před nastupujícími; při hraní je za hráčem. */
+  /**
+   * Kamera: nástup = před zápasníky; zápas = z boku na dvojici (jako bojovky), kolmo na spojnici,
+   * vzdálenost podle rozestupu; 3 na 3 při sledování krouží kolem klece.
+   */
   camera(cam, dt) {
     let tx, ty, tz, px, py, pz;
     const walking = this.phase === 'walkBlue' || this.phase === 'walkRed';
+    let a = null, b = null;
+    if (!walking) {
+      if (this.me) { a = this.me; b = this.nearestFoe(this.me) || this.blue.find((q) => q.act !== 'ko') || this.blue[0]; }
+      else if (!this.team) { a = this.red[0]; b = this.blue[0]; }
+    }
     if (walking) {
       const list = this.phase === 'walkBlue' ? this.blue : this.red, f = list.find((q) => q.m.visible && q.pi < q.path.length) || list[0];
       tx = f.x; ty = f.y + 1.4; tz = f.z;
       px = f.x + Math.sin(f.h) * 4.8; pz = f.z + Math.cos(f.h) * 4.8; py = f.y + 2.3;
-    } else if (this.me && this.phase !== 'end' && this.me.act !== 'ko') {
-      const me = this.me, op = this.nearestFoe(me) || { x: C.x, z: C.z }, dx = me.x - op.x, dz = me.z - op.z, d = Math.hypot(dx, dz) || 1;
-      this.camYawNow = Math.atan2(op.x - me.x, op.z - me.z);
-      tx = (me.x + op.x) / 2; tz = (me.z + op.z) / 2; ty = me.y + 1.3;
-      px = me.x + (dx / d) * 3.8 + (-dz / d) * 0.9; pz = me.z + (dz / d) * 3.8 + (dx / d) * 0.9; py = me.y + 2.6;
+    } else if (a && b) {
+      const mx = (a.x + b.x) / 2, mz = (a.z + b.z) / 2, dx = b.x - a.x, dz = b.z - a.z, sep = Math.hypot(dx, dz) || 1;
+      let nx = -dz / sep, nz = dx / sep;
+      // strana kamery: ta, kde už je (aby nepřeskakovala), jinak blíž ke středu klece
+      const prev = this.camP || new THREE.Vector3(mx + nx, 0, mz + nz);
+      if ((prev.x - mx) * nx + (prev.z - mz) * nz < 0) { nx = -nx; nz = -nz; }
+      const dist = 3.0 + sep * 0.6;
+      tx = mx; tz = mz; ty = this.deckTop + 1.05 + Math.max(a.yOff || 0, b.yOff || 0) * 0.4;
+      px = mx + nx * dist; pz = mz + nz * dist; py = this.deckTop + 1.55;
+      // vektor „vpravo na obrazovce“ pro ovládání A/D
+      this.screenRight = { x: -nz, z: nx };
     } else {
       const L = this.alive(this.all).length ? this.alive(this.all) : this.all;
-      tx = L.reduce((s, f) => s + f.x, 0) / L.length; tz = L.reduce((s, f) => s + f.z, 0) / L.length; ty = this.deckTop + 1.2;
+      tx = L.reduce((s2, f) => s2 + f.x, 0) / L.length; tz = L.reduce((s2, f) => s2 + f.z, 0) / L.length; ty = this.deckTop + 1.2;
       const ang = this.game.time * 0.12;
       px = C.x + Math.cos(ang) * 10.5; pz = C.z + Math.sin(ang) * 10.5; py = this.gy + 5.5;
     }
     this.camP ||= new THREE.Vector3(px, py, pz);
-    this.camP.lerp(new THREE.Vector3(px, py, pz), Math.min(1, dt * 3));
-    cam.position.copy(this.camP); cam.up.set(0, 1, 0); cam.lookAt(tx, ty, tz);
+    this.camP.lerp(new THREE.Vector3(px, py, pz), Math.min(1, dt * 4));
+    cam.position.copy(this.camP);
+    if (this.shake > 0) { cam.position.x += (Math.random() - 0.5) * this.shake * 0.25; cam.position.y += (Math.random() - 0.5) * this.shake * 0.25; this.shake = Math.max(0, this.shake - dt * 3); }
+    cam.up.set(0, 1, 0); cam.lookAt(tx, ty, tz);
+    // stěny klece mezi kamerou a zápasníky schovat (jinak zakrývají souboj)
+    const cx = cam.position.x - C.x, cz = cam.position.z - C.z, cl = Math.hypot(cx, cz) || 1, outside = cl > R * 0.75 && cam.position.y < this.deckTop + 3;
+    for (const c of this.cage || []) {
+      const px2 = c.cx - C.x, pz2 = c.cz - C.z, pl = Math.hypot(px2, pz2) || 1;
+      const hide = outside && (px2 * cx + pz2 * cz) / (pl * cl) > 0.72;
+      for (const m of c.meshes) m.visible = !hide;
+    }
   }
   /** Cíle pro zbraně: diváci a bachaři kolem oktagonu. */
   targets() {
@@ -676,6 +821,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     this.active = false;
     G.scene.remove(this.group);
     for (const f of [...(this.all || []), this.ref]) if (f) G.scene.remove(f.m);
+    document.getElementById('mma-flash')?.remove();
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }

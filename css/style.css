@@ -308,3 +308,8 @@ body.mma-play .tbtns-mma { transform: none; opacity: 1; pointer-events: auto; }
 .tb-punch { background: rgba(57,255,20,.8) !important; color: #04140b; }
 .tb-kick { background: rgba(255,214,0,.85) !important; color: #1a1400; }
 .tb-mid { width: 60px !important; height: 60px !important; font-size: 24px !important; justify-self: center; }
+
+.tbtns-mma { grid-template-columns: auto auto auto auto; }
+.tbtns-mma .tb-big { grid-column: span 2; }
+.tb-mid { display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; font-size: 20px !important; }
+.tb-mid small { font-size: 9px; font-weight: 800; margin-top: 2px; }
