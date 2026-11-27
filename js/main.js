@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127152209';
-import { buildWorld } from './world.js?v=20261127152209';
-import { loadModels } from './models.js?v=20261127152209';
-import { Game } from './game.js?v=20261127152209';
-import { Hud } from './hud.js?v=20261127152209';
-import { Input } from './input.js?v=20261127152209';
-import { PrisonFX } from './prisonfx.js?v=20261127152209';
-import { Audio } from './audio.js?v=20261127152209';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127152209';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127152720';
+import { buildWorld } from './world.js?v=20261127152720';
+import { loadModels } from './models.js?v=20261127152720';
+import { Game } from './game.js?v=20261127152720';
+import { Hud } from './hud.js?v=20261127152720';
+import { Input } from './input.js?v=20261127152720';
+import { PrisonFX } from './prisonfx.js?v=20261127152720';
+import { Audio } from './audio.js?v=20261127152720';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127152720';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -16,6 +16,19 @@ import { GTAOPass } from 'three/addons/postprocessing/GTAOPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (id) => document.getElementById(id);
+
+// automatická aktualizace: když je na webu novější verze (jiné ?v= u main.js), stránka se sama obnoví
+(async () => {
+  try {
+    const cur = (document.querySelector('script[type=module][src*="main.js"]')?.src.match(/v=(\d+)/) || [])[1];
+    const html = await (await fetch(`index.html?ts=${Date.now()}`, { cache: 'no-store' })).text();
+    const live = (html.match(/main\.js\?v=(\d+)/) || [])[1];
+    if (cur && live && live !== cur && sessionStorage.getItem('vv-reload') !== live) {
+      sessionStorage.setItem('vv-reload', live);
+      location.replace(location.pathname + '?v=' + live);
+    }
+  } catch { /* offline */ }
+})();
 const mobile = matchMedia('(pointer: coarse)').matches || innerWidth < 700;
 
 if ($('btn-about')) $('btn-about').onclick = () => ($('about').hidden = !$('about').hidden);
