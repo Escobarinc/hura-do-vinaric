@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127143346';
-import { Crowd } from './crowd.js?v=20261127143346';
-import { PrisonFX } from './prisonfx.js?v=20261127143346';
+import { makeHuman, animateHuman } from './entities.js?v=20261127143823';
+import { Crowd } from './crowd.js?v=20261127143823';
+import { PrisonFX } from './prisonfx.js?v=20261127143823';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -185,7 +185,11 @@ export class MMA {
 
   /** mode: 'watch' | 'play' (1 na 1, hráč = vězeň) | 'team' (3 na 3) | 'teamPlay' (3 na 3, hráč = vězeň) */
   start(mode = 'watch') {
-    if (this.active) { if (mode === 'play' || mode === 'teamPlay') this.takeOver(); else this.game.toast('Zápas už probíhá'); return; }
+    if (this.active) {
+      const wantTeam = mode === 'team' || mode === 'teamPlay', play = mode === 'play' || mode === 'teamPlay';
+      if (play && wantTeam === this.team && !this.playAs) { this.takeOver(); return; }
+      this.finish(true); // jiná varianta: hned nový nástup a zápas
+    }
     const G = this.game;
     this.build();
     this.active = true;
@@ -212,7 +216,7 @@ export class MMA {
     for (const [list, team] of [[this.blue, 'blue'], [this.red, 'red']]) list.forEach((f, k) => {
       const [cx, cz] = corner(team, k);
       f.path = [[this.stairFoot[0], this.stairFoot[1]], [this.stairTop[0], this.stairTop[1]], [this.doorPt[0], this.doorPt[1]], [cx, cz]];
-      f.pi = 0; f.delay = k * 1.6; f.corner = [cx, cz];
+      f.pi = 0; f.delay = k * 0.8; f.corner = [cx, cz];
       this.place(f, this.carpetStart[0], this.carpetStart[1], 0); f.m.visible = false;
     });
     this.phase = 'walkBlue'; this.t = 0; this.round = 0; this.clock = ROUND_S;
@@ -357,7 +361,7 @@ export class MMA {
     f.m.visible = true;
     const p = f.path[f.pi];
     if (!p) { this.idle(f, dt); return true; }
-    const dx = p[0] - f.x, dz = p[1] - f.z, d = Math.hypot(dx, dz), v = 1.5;
+    const dx = p[0] - f.x, dz = p[1] - f.z, d = Math.hypot(dx, dz), v = 2.7; // svižný nástup
     if (d < 0.12) { f.pi++; if (f.pi >= f.path.length) { this.idle(f, dt); return true; } return false; }
     const s = Math.min(d, v * dt);
     f.x += (dx / d) * s; f.z += (dz / d) * s; f.h = Math.atan2(dx, dz);
@@ -568,12 +572,16 @@ export class MMA {
     this.hype = Math.max(0.25, (this.hype || 0.5) - dt * 0.35);
     const roar = this.phase === 'end' || this.phase === 'intro' || this.phase === 'walkBlue' || this.phase === 'walkRed' ? 0.9 : this.hype;
     for (const f of this.fans) {
+      if (Cr.dead[f.i]) continue;
       const jump = Math.max(0, Math.sin(t * (5 + f.hype * 3) + f.ph)) * 0.25 * roar * (0.4 + f.hype);
       const cheering = roar * (0.5 + f.hype) > 0.6 || Math.sin(t * 0.7 + f.ph) > 0.6;
       Cr.set(f.i, f.x, f.y + jump, f.z, f.h, 0, cheering ? 'riot' : 'walk', t);
     }
+    const gnd = (x, z) => this.game.city.ground(x, z);
+    Cr.updateCorpses(dt, gnd, () => {});
     Cr.commit();
-    this.guardPos.forEach((p, i) => this.guards.set(i, p.x, p.y, p.z, p.h, 0, 'walk', t));
+    this.guardPos.forEach((p, i) => { if (!this.guards.dead[i]) this.guards.set(i, p.x, p.y, p.z, p.h, 0, p.panic ? 'riot' : 'walk', t); });
+    this.guards.updateCorpses(dt, gnd, () => {});
     this.guards.commit();
     for (const d of this.dogs) { d.m.userData.tail.rotation.z = Math.sin(t * 9 + d.ph) * 0.5; if (Math.random() < dt * 0.05) this.game.prisonFx?.bark?.(); }
     this.noiseT = (this.noiseT || 0) - dt;
@@ -621,9 +629,23 @@ export class MMA {
     this.camP.lerp(new THREE.Vector3(px, py, pz), Math.min(1, dt * 3));
     cam.position.copy(this.camP); cam.up.set(0, 1, 0); cam.lookAt(tx, ty, tz);
   }
+  /** Cíle pro zbraně: diváci a bachaři kolem oktagonu. */
+  targets() {
+    const out = [];
+    if (!this.active) return out;
+    for (const Cr of [this.crowd, this.guards]) {
+      if (!Cr) continue;
+      Cr._uid ||= Math.random().toString(36).slice(2);
+      for (let i = 0; i < Cr.cap; i++) {
+        if (!Cr.vis[i] || Cr.dead[i]) continue;
+        out.push({ key: `${Cr._uid}:${i}`, crowd: Cr, ci: i, mesh: { position: { x: Cr.x[i], y: Cr.y[i], z: Cr.z[i] } }, kill: (dir, boom) => { Cr.kill(i, dir, boom?.vel || null); this.hype = 1; this.status = '🔫 Střelba do diváků!'; } });
+      }
+    }
+    return out;
+  }
   focusPt() { const f = this.me || this.red?.[0]; return { x: f ? f.x : C.x, y: f ? f.y : this.gy || 0, z: f ? f.z : C.z, vx: 0, vz: 0, v: 0, h: f ? f.h : 0, hp: 100 }; }
 
-  finish() {
+  finish(quiet = false) {
     const G = this.game;
     if (!this.active) return;
     this.active = false;
@@ -640,6 +662,7 @@ export class MMA {
       Object.assign(G.player, { x: s[0] + 2, z: s[1], y: G.city.ground(s[0] + 2, s[1]), vy: 0 });
     }
     G.player.mesh.visible = true;
-    G.toast?.('Zápas skončil');
+    if (!quiet) G.toast?.('Zápas skončil');
+    this.playAs = false; this.me = null;
   }
 }
