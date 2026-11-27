@@ -302,17 +302,18 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     if (pc.broken) return;
     pc.broken = true;
     for (const f of pc.f) f.off = true;
+    if (pc.obst) { pc.obst.r = 0; pc.obst.h = -99; }
     for (const r of pc.ranges) {
       const a = r.mesh.geometry.attributes.position;
       for (let i = r.start; i < r.start + r.count; i++) a.setY(i, -500);
       a.needsUpdate = true;
     }
-    const city = this.game.city, y = city.ground(pc.cx, pc.cz), wall = pc.kind === 'wall';
+    const city = this.game.city, y = city.ground(pc.cx, pc.cz), wall = pc.kind === 'wall', mk = wall ? 'wall' : 'fence';
     this.debrisGeo ||= new THREE.BoxGeometry(1, 1, 1);
     this.debrisM ||= { wall: new THREE.MeshStandardMaterial({ color: '#cfcbc2', roughness: 0.95 }), fence: new THREE.MeshStandardMaterial({ color: '#9aa0a4', metalness: 0.6, roughness: 0.45 }) };
     const n = wall ? 7 : 3;
     for (let k = 0; k < n; k++) {
-      const m = new THREE.Mesh(this.debrisGeo, this.debrisM[pc.kind]);
+      const m = new THREE.Mesh(this.debrisGeo, this.debrisM[mk]);
       const sz = wall ? 0.35 + Math.random() * 0.7 : 0.08;
       m.scale.set(wall ? sz : 1.4, wall ? sz * 0.7 : 1.2 + Math.random(), wall ? sz : sz);
       m.position.set(pc.cx + (Math.random() - 0.5) * 1.2, y + Math.random() * (wall ? 3 : 1.5), pc.cz + (Math.random() - 0.5) * 1.2);
@@ -325,8 +326,43 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     const now = performance.now();
     if (now - (this.breakSnd || 0) > 90) { this.breakSnd = now; this.game.audio?.noise?.(wall ? 0.5 : 0.25, wall ? 0.7 : 0.4, wall ? 220 : 1400); }
   }
+  /** Rozdrtí drobnost (lavička, budka, přístřešek…): zploští se nebo odletí, zmizí její kolize. */
+  smashProp(pr, dx, dz, boom = false) {
+    if (pr.broken) return;
+    pr.broken = true;
+    if (pr.obst) { pr.obst.r = 0; pr.obst.h = -99; }
+    const o = pr.obj;
+    if (pr.tree) { o.rotation.z = (dx >= 0 ? -1 : 1) * 1.45; o.rotation.y = Math.atan2(dx, dz); } // strom se skácí
+    else if (boom) { o.visible = false; }
+    else { o.scale.y = 0.12; o.position.y = this.game.city.ground(pr.x, pr.z) + 0.03; o.rotation.z += (Math.random() - 0.5) * 0.3; }
+    const y = this.game.city.ground(pr.x, pr.z);
+    this.debrisGeo ||= new THREE.BoxGeometry(1, 1, 1);
+    this.propDebM ||= new THREE.MeshStandardMaterial({ color: '#8a6a4a', roughness: 0.9 });
+    for (let k = 0; k < 4; k++) {
+      const m = new THREE.Mesh(this.debrisGeo, this.propDebM); const s2 = 0.12 + Math.random() * 0.25; m.scale.set(s2 * 2, s2 * 0.4, s2);
+      m.position.set(pr.x, y + 0.5, pr.z); this.scene.add(m);
+      this.debris.push({ m, v: new THREE.Vector3(dx * (2 + Math.random() * 3) + (Math.random() - 0.5) * 2, 2 + Math.random() * 3, dz * (2 + Math.random() * 3) + (Math.random() - 0.5) * 2), spin: (Math.random() - 0.5) * 9, t: 0, half: s2 * 0.2 });
+    }
+    for (let k = 0; k < 8; k++) this.dust.emit(pr.x, y + 0.5, pr.z, (Math.random() - 0.5) * 3, Math.random() * 2, (Math.random() - 0.5) * 3, 1.2, 4);
+    const now = performance.now();
+    if (now - (this.propSnd || 0) > 80) { this.propSnd = now; this.game.audio?.noise?.(0.2, 0.5, 900); }
+  }
+  /** Tank přejede drobnosti před sebou i pod sebou. */
+  crushProps(v) {
+    const fx = Math.sin(v.h), fz = Math.cos(v.h), dir = Math.sign(v.v || 1);
+    for (const pr of this.game.city.props || []) {
+      if (pr.broken || Math.abs(pr.x - v.x) > 8 || Math.abs(pr.z - v.z) > 8) continue;
+      const dx = pr.x - v.x, dz = pr.z - v.z;
+      if (Math.abs(dx * fx + dz * fz) < v.L / 2 + pr.r && Math.abs(dx * fz - dz * fx) < v.W / 2 + pr.r * 0.6) this.smashProp(pr, fx * dir, fz * dir);
+    }
+  }
   /** Výbuch rozbije zdi a ploty v okruhu r. */
   breakNear(x, z, r) {
+    for (const pr of this.game.city.props || []) {
+      if (pr.broken || Math.abs(pr.x - x) > r || Math.abs(pr.z - z) > r) continue;
+      const d = Math.hypot(pr.x - x, pr.z - z);
+      if (d < r) this.smashProp(pr, (pr.x - x) / (d || 1), (pr.z - z) / (d || 1), true);
+    }
     for (const pc of this.game.city.breakables || []) {
       if (pc.broken || Math.abs(pc.cx - x) > r + 2 || Math.abs(pc.cz - z) > r + 2) continue;
       const d = Math.hypot(pc.cx - x, pc.cz - z);

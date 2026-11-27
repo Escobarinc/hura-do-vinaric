@@ -1,4 +1,4 @@
-import { Grid, pointInPoly, closestOnSeg } from './util.js?v=20261127135404';
+import { Grid, pointInPoly, closestOnSeg } from './util.js?v=20261127135633';
 
 export const AI_ROADS = new Set(['primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary',
   'tertiary_link', 'unclassified', 'residential', 'living_street', 'busway']);
@@ -408,7 +408,7 @@ export class City {
    * Vytlačí kruh z budov. y = absolutní výška objektu (budovy nižší než y se ignorují); bez y = na zemi.
    * Vrací {x, z, hit, nx, nz}.
    */
-  collide(x, z, r, y = null) {
+  collide(x, z, r, y = null, noObst = false) {
     let hit = false, nx = 0, nz = 0;
     for (let iter = 0; iter < 3; iter++) {
       let moved = false;
@@ -434,7 +434,7 @@ export class City {
         nx += ux; nz += uz;
         hit = moved = true;
       });
-      for (const o of this.obstacles) {
+      if (!noObst) for (const o of this.obstacles) {
         const dx = x - o.x, dz = z - o.z, d = Math.hypot(dx, dz), rr = o.r + r;
         if (d >= rr || (y != null && y > this.ground(o.x, o.z) + o.h)) continue;
         const ux = d ? dx / d : 1, uz = d ? dz / d : 0;

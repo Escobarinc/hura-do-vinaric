@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { hash01, pointInPoly, nextFrame } from './util.js?v=20261127135404';
-import { K_PEN } from './data.js?v=20261127135404';
-import * as TX from './textures.js?v=20261127135404';
+import { hash01, pointInPoly, nextFrame } from './util.js?v=20261127135633';
+import { K_PEN } from './data.js?v=20261127135633';
+import * as TX from './textures.js?v=20261127135633';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* --------- pomocný buffer geometrie --------- */
@@ -1795,18 +1795,23 @@ function buildYards(root, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, st
         goal.position.set(gx, y, gz);
         goal.rotation.y = rot;
         root.add(goal);
+        addProp(city, gx, gz, 1.6, goal);
       }
     }
     if (Y.type === 'gym') {
       for (const [lx, lz] of [[-hw + 4, -3.5], [-hw + 8, -3.5], [hw - 6, 3.5]]) {
         const [bx, bz] = L(lx, lz), [ax, az] = L(lx - 0.85, lz), [cx2, cz2] = L(lx + 0.85, lz);
-        for (const [px, pz] of [L(lx - 0.8, lz), L(lx + 0.8, lz)]) geos.steel.push(beamGeo(V(px, y, pz), V(px, y + 2.4, pz), 0.08));
-        geos.steel.push(beamGeo(V(ax, y + 2.35, az), V(cx2, y + 2.35, cz2), 0.05));
-        city.obstacles.push({ x: bx, z: bz, r: 0.9, h: 2.4 });
+        const ob = { x: bx, z: bz, r: 0.9, h: 2.4 };
+        const pid = propPiece(city, bx, bz, 1.0, ob);
+        for (const [px, pz] of [L(lx - 0.8, lz), L(lx + 0.8, lz)]) { geos.steel.push(beamGeo(V(px, y, pz), V(px, y + 2.4, pz), 0.08)); geos.steel[geos.steel.length - 1].userData.dz = pid; }
+        geos.steel.push(beamGeo(V(ax, y + 2.35, az), V(cx2, y + 2.35, cz2), 0.05)); geos.steel[geos.steel.length - 1].userData.dz = pid;
+        city.obstacles.push(ob);
       }
       for (const [lx, lz] of [[-4, 3.5], [4, -3.5]]) {
-        for (const sd of [-0.25, 0.25]) for (const e of [-1, 1]) { const [px, pz] = L(lx + e, lz + sd); geos.steel.push(beamGeo(V(px, y, pz), V(px, y + 1.3, pz), 0.06)); }
-        for (const sd of [-0.25, 0.25]) { const [ax, az] = L(lx - 1.1, lz + sd), [bx2, bz2] = L(lx + 1.1, lz + sd); geos.steel.push(beamGeo(V(ax, y + 1.3, az), V(bx2, y + 1.3, bz2), 0.05)); }
+        const [qx, qz] = L(lx, lz), pid = propPiece(city, qx, qz, 1.2);
+        const tg = () => { geos.steel[geos.steel.length - 1].userData.dz = pid; };
+        for (const sd of [-0.25, 0.25]) for (const e of [-1, 1]) { const [px, pz] = L(lx + e, lz + sd); geos.steel.push(beamGeo(V(px, y, pz), V(px, y + 1.3, pz), 0.06)); tg(); }
+        for (const sd of [-0.25, 0.25]) { const [ax, az] = L(lx - 1.1, lz + sd), [bx2, bz2] = L(lx + 1.1, lz + sd); geos.steel.push(beamGeo(V(ax, y + 1.3, az), V(bx2, y + 1.3, bz2), 0.05)); tg(); }
       }
     }
     if (Y.type !== 'court') {
@@ -1819,6 +1824,7 @@ function buildYards(root, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, st
         bench.add(seat, back, legs);
         bench.position.set(bx, y, bz); bench.rotation.y = rot;
         root.add(bench);
+        addProp(city, bx, bz, 1.0, bench);
       }
     }
     // telefonní automat uprostřed strany u cesty (vedle branky), čelem do dvora
@@ -1828,10 +1834,12 @@ function buildYards(root, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, st
       const lx = along ? 3.4 : gl[0] + sgn[0] * 0.55, lz = along ? gl[1] + sgn[1] * 0.55 : 3.4;
       const [px, pz] = L(lx, lz);
       const face = Math.atan2(ux * sgn[0] + vx * sgn[1], uz * sgn[0] + vz * sgn[1]); // směr do dvora (svět)
-      root.add(phoneBooth(px, y, pz, face));
+      const booth = phoneBooth(px, y, pz, face);
+      root.add(booth);
       const [sx, sz] = L(lx + sgn[0] * 0.75, lz + sgn[1] * 0.75);
       (city.phones ||= []).push({ x: sx, z: sz, h: face + Math.PI, yard: Y.id });
-      city.obstacles.push({ x: px, z: pz, r: 0.35, h: 2.3 });
+      const ob = { x: px, z: pz, r: 0.35, h: 2.3 }; city.obstacles.push(ob);
+      addProp(city, px, pz, 0.8, booth, ob);
     }
     // přístřešky (poloha z ortofota), natočené s dvorem
     for (const [hx, hz] of Y.huts || []) {
@@ -1842,9 +1850,20 @@ function buildYards(root, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, st
       hut.add(roof, bench);
       hut.position.set(hx, y, hz); hut.rotation.y = rot;
       root.add(hut);
-      city.obstacles.push({ x: hx, z: hz, r: 0.3, h: 2.5 });
+      const ob = { x: hx, z: hz, r: 0.3, h: 2.5 }; city.obstacles.push(ob);
+      addProp(city, hx, hz, 1.8, hut, ob);
     }
   }
+}
+
+/** Rozbitelné drobnosti (lavičky, přístřešky, automaty, branky, boudy…): tank je přejede, výbuch rozmetá. */
+function addProp(city, x, z, r, obj, obst = null) { (city.props ||= []).push({ x, z, r, obj, obst, broken: false }); }
+/** Rozbitelný kus sloučené geometrie (hrazdy apod.): geometrie v seznamu geos dostanou userData.dz. */
+function propPiece(city, x, z, r, obst = null) {
+  const brk = (city.breakables ||= []);
+  const pc = { id: brk.length, kind: 'prop', x0: x - r, z0: z, x1: x + r, z1: z, cx: x, cz: z, H: 2.4, f: [], ranges: [], broken: false, obst };
+  brk.push(pc);
+  return pc.id;
 }
 
 /** Telefonní automat pro odsouzené: sloupek, zadní deska, akustická stříška, přístroj se sluchátkem. face = kam míří přední strana. */
@@ -1977,8 +1996,9 @@ function buildBackYard(root, city, G, fence, geos, boxAt, beamGeo, V, steel, dar
     const hr = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 1.2), roofM); hr.position.y = 0.86; hr.rotation.x = 0.12;
     const hole = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.45), lmMat('#151515')); hole.position.set(0, 0.32, 0.505);
     house.add(hb, hr, hole); house.position.set(cx - w * 0.22, ky + 0.12, K.z0 + 0.9); root.add(house);
+    addProp(city, cx - w * 0.22, K.z0 + 0.9, 0.8, house);
     // miska
-    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.08, 12), lmMat('#9aa0a6', { metalness: 0.7 })); bowl.position.set(cx + w * 0.3, ky + 0.16, K.z1 - 0.6); root.add(bowl);
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.08, 12), lmMat('#9aa0a6', { metalness: 0.7 })); bowl.position.set(cx + w * 0.3, ky + 0.16, K.z1 - 0.6); root.add(bowl); addProp(city, cx + w * 0.3, K.z1 - 0.6, 0.4, bowl);
     city.dogRuns.push({ x0: K.x0 + k * w + 0.5, x1: K.x0 + (k + 1) * w - 0.5, z0: K.z0 + 1.9, z1: K.z1 - 0.5, y: ky + 0.12 });
   }
   // stromy
@@ -1993,7 +2013,8 @@ function buildBackYard(root, city, G, fence, geos, boxAt, beamGeo, V, steel, dar
       c.castShadow = true; tr.add(c);
     }
     trunk.castShadow = true; tr.position.set(x, y, z); root.add(tr);
-    city.obstacles.push({ x, z, r: 0.45, h: r });
+    const ob = { x, z, r: 0.45, h: r }; city.obstacles.push(ob);
+    addProp(city, x, z, 1.2, tr, ob); city.props[city.props.length - 1].tree = true;
   }
   // sklad palet, sudy, kontejner, buňka
   const palletM = lmMat('#a07a4c', { roughness: 0.9 });
@@ -2002,8 +2023,8 @@ function buildBackYard(root, city, G, fence, geos, boxAt, beamGeo, V, steel, dar
   }
   void palletM;
   const barrelM = lmMat('#2a5bb8', { roughness: 0.5 });
-  for (const [x, z] of [[-196, 1126.5], [-195.2, 1127.4], [-196.8, 1127.6], [-194.6, 1126.4]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 10), barrelM); b.position.set(x, G(x, z) + 0.45, z); b.castShadow = true; root.add(b); }
-  const cont = (x, z, w2, d, h, col, rot = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w2, h, d), lmMat(col, { roughness: 0.7, metalness: 0.3 })); m.position.set(x, G(x, z) + h / 2, z); m.rotation.y = rot; m.castShadow = true; root.add(m); city.obstacles.push({ x, z, r: Math.max(w2, d) / 2, h }); };
+  for (const [x, z] of [[-196, 1126.5], [-195.2, 1127.4], [-196.8, 1127.6], [-194.6, 1126.4]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 10), barrelM); b.position.set(x, G(x, z) + 0.45, z); b.castShadow = true; root.add(b); addProp(city, x, z, 0.5, b); }
+  const cont = (x, z, w2, d, h, col, rot = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w2, h, d), lmMat(col, { roughness: 0.7, metalness: 0.3 })); m.position.set(x, G(x, z) + h / 2, z); m.rotation.y = rot; m.castShadow = true; root.add(m); const ob = { x, z, r: Math.max(w2, d) / 2, h }; city.obstacles.push(ob); addProp(city, x, z, Math.max(w2, d) / 2 + 0.5, m, ob); };
   cont(-227.5, 1139.5, 2.4, 6.0, 2.5, '#7b4a2c'); // buňka u stromů
   cont(-228, 1158, 1.6, 1.2, 1.3, '#d9b02a'); cont(-225.5, 1158.4, 1.4, 1.1, 1.2, '#2c62b0'); cont(-221.5, 1158.8, 1.0, 1.4, 1.6, '#8a9096');
 }

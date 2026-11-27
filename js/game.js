@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127135404';
-import { PrisonLife } from './prison.js?v=20261127135404';
-import { Weapons } from './weapons.js?v=20261127135404';
-import { PrisonFX } from './prisonfx.js?v=20261127135404';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127135404';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127135633';
+import { PrisonLife } from './prison.js?v=20261127135633';
+import { Weapons } from './weapons.js?v=20261127135633';
+import { PrisonFX } from './prisonfx.js?v=20261127135633';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127135633';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -401,19 +401,21 @@ export class Game {
       const down = inp.down('KeyX', 'ControlLeft') || (sprint && P.y > floor + 0.3); // ve vzduchu Shift = dolů
       if (thrust) P.vy = Math.min(9, P.vy + 26 * dt);
       else if (down) P.vy = Math.max(-14, P.vy - 20 * dt);
-      else if (P.y > floor + 0.3) P.vy *= Math.max(0, 1 - dt * 4); // bez ovládání visí ve vzduchu (klesá se jen na X)
+      else if (P.y > floor + 0.3 && !this.chute && !this.freefall) P.vy *= Math.max(0, 1 - dt * 4); // bez ovládání visí ve vzduchu (klesá se jen na X)
+      else if (this.chute || this.freefall) P.vy -= 15 * dt; // s padákem / po výskoku se padá (padák brzdí níže)
       else P.vy -= 15 * dt;
       if (P.y > floor + 160) P.vy = Math.min(P.vy, 0);
     } else {
       if (inp.hit('Space') && P.y <= floor + 0.05 && !swimming) P.vy = 5.2;
       P.vy -= 15 * dt;
     }
-    if (this.chute) P.vy = Math.max(P.vy, -4.2); // otevřený padák brzdí pád
+    if (this.chute && P.vy < -4.2) P.vy += (-4.2 - P.vy) * Math.min(1, dt * 3); // otevřený padák brzdí pád až na ~4 m/s
     P.y += P.vy * dt;
     if (P.y <= floor) {
       if (P.vy < -14 && !this.jetpack) this.hurt((-P.vy - 14) * 6, 'pád');
       P.y = floor; P.vy = Math.max(0, thrust ? P.vy : 0);
       if (this.chute) this.closeChute(true);
+      this.freefall = false;
     }
     this.updateChute(dt);
     this.updateJetpackFx(dt, thrust);
@@ -456,6 +458,7 @@ export class Game {
     if (v.kind === 'jet') v.mesh.userData.flameM.opacity = 0;
     v.falling = true; v.fallVy = v.kind === 'jet' ? Math.sin(v.pitch || 0) * (v.spd || 0) : (v.vy || 0);
     Object.assign(P, { x: v.x, z: v.z, y: v.y + 3.5, vy: 7, h: v.h });
+    this.freefall = true; // po výskoku se vždy padá, i se zapnutým jetpackem
     P.mesh.visible = true;
     this.audio.door(); this.audio?.blip?.(220, 0.3, 'sawtooth', 0.08, 300);
     this.toast('Katapultáž! P = otevřít padák · J = jetpack');
@@ -706,7 +709,7 @@ export class Game {
     else if (Math.hypot(v.vx, v.vz) > 14) this.weapons?.ramBreak(v, false);
     v.drive(dt, { throttle: a.y, steer: -a.x, hand: inp.down('Space') }, this.city);
     this.weapons?.runOver(v);
-    if (v.isTank) { this.updateTankGun(v, dt); this.weapons?.crushCars(v); }
+    if (v.isTank) { this.updateTankGun(v, dt); this.weapons?.crushCars(v); if (Math.abs(v.v) > 0.3) { this.weapons?.crushProps(v); this.weapons?.ramBreak(v, true); } }
     if (v.lastImpact > 6) this.audio.crash(v.lastImpact);
     if (v.dead && v.sink > 2.4) {
       this.toast('Auto skončilo v řece!');

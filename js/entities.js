@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { clamp, pick, wrapAngle } from './util.js?v=20261127135404';
-import { labelTexture } from './textures.js?v=20261127135404';
-import { KIT, kitCar, kitHuman, animateKitHuman } from './models.js?v=20261127135404';
+import { clamp, pick, wrapAngle } from './util.js?v=20261127135633';
+import { labelTexture } from './textures.js?v=20261127135633';
+import { KIT, kitCar, kitHuman, animateKitHuman } from './models.js?v=20261127135633';
 
 /* =========================================================
  *  MATERIÁLY
@@ -593,7 +593,7 @@ export class Vehicle {
     // dva kruhy (předek, zadek)
     for (const s of [1, -1]) {
       const cx = nx + fx * off * s, cz = nz + fz * off * s;
-      const c = city.collide(cx, cz, this.r, this.y);
+      const c = city.collide(cx, cz, this.r, this.y, !!this.isTank); // tank přejede sloupky, lavičky, budky…
       if (c.hit) {
         nx += c.x - cx; nz += c.z - cz;
         const dot = this.vx * c.nx + this.vz * c.nz;
