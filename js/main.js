@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127192159';
-import { buildWorld } from './world.js?v=20261127192159';
-import { loadModels } from './models.js?v=20261127192159';
-import { Game } from './game.js?v=20261127192159';
-import { Hud } from './hud.js?v=20261127192159';
-import { Input } from './input.js?v=20261127192159';
-import { PrisonFX } from './prisonfx.js?v=20261127192159';
-import { Audio } from './audio.js?v=20261127192159';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127192159';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127192302';
+import { buildWorld } from './world.js?v=20261127192302';
+import { loadModels } from './models.js?v=20261127192302';
+import { Game } from './game.js?v=20261127192302';
+import { Hud } from './hud.js?v=20261127192302';
+import { Input } from './input.js?v=20261127192302';
+import { PrisonFX } from './prisonfx.js?v=20261127192302';
+import { Audio } from './audio.js?v=20261127192302';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127192302';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -59,7 +59,7 @@ function gateSlam() {
     stage.style.cursor = 'pointer';
     stage.addEventListener('click', () => {
       const logo = stage.querySelector('.logo');
-      for (const el of [gate, logo]) { el.style.animation = 'none'; void el.offsetWidth; el.style.animation = ''; }
+      for (const el of [gate, logo]) { el.style.setProperty('animation', 'none', 'important'); void el.offsetWidth; el.style.removeProperty('animation'); }
     });
   }
 }
