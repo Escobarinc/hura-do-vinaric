@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127192302';
-import { buildWorld } from './world.js?v=20261127192302';
-import { loadModels } from './models.js?v=20261127192302';
-import { Game } from './game.js?v=20261127192302';
-import { Hud } from './hud.js?v=20261127192302';
-import { Input } from './input.js?v=20261127192302';
-import { PrisonFX } from './prisonfx.js?v=20261127192302';
-import { Audio } from './audio.js?v=20261127192302';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127192302';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127194543';
+import { buildWorld } from './world.js?v=20261127194543';
+import { loadModels } from './models.js?v=20261127194543';
+import { Game } from './game.js?v=20261127194543';
+import { Hud } from './hud.js?v=20261127194543';
+import { Input } from './input.js?v=20261127194543';
+import { PrisonFX } from './prisonfx.js?v=20261127194543';
+import { Audio } from './audio.js?v=20261127194543';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127194543';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -17,38 +17,54 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 
 const $ = (id) => document.getElementById(id);
 
-/** Zvuk zaklapnuté ocelové mříže (syntetizovaný: dunivý náraz, kovové zazvonění, drnčení odskoků). */
+/**
+ * Zvuk zabouchnutých vězeňských mříží (syntetizovaný): ostrý kovový úder, těžké žuchnutí, zvonění tyčí
+ * se záznějemi (rozladěné dvojice parciál), cvaknutí zámku a ozvěna betonové chodby.
+ */
 let gateCtx = null;
 function gateSlam() {
   try {
     gateCtx ||= new (window.AudioContext || window.webkitAudioContext)();
     const c = gateCtx;
     if (c.state === 'suspended') c.resume();
-    const t0 = c.currentTime + 0.01, out = c.createGain();
-    out.gain.value = 0.9; out.connect(c.destination);
-    const noise = (dur) => { const b = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const s2 = c.createBufferSource(); s2.buffer = b; return s2; };
-    // dunivý náraz
+    const t0 = c.currentTime + 0.01;
+    const noiseBuf = (dur) => { const b = c.createBuffer(1, Math.ceil(c.sampleRate * dur), c.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; return b; };
+    // ozvěna betonové chodby (generovaná impulzní odezva)
+    const ir = c.createBuffer(2, c.sampleRate * 2.2, c.sampleRate);
+    for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 3.2) * (i < 900 ? 0.2 : 1); }
+    const rev = c.createConvolver(); rev.buffer = ir;
+    const dry = c.createGain(), wet = c.createGain(); dry.gain.value = 0.85; wet.gain.value = 0.38;
+    dry.connect(c.destination); rev.connect(wet).connect(c.destination);
+    const bus = c.createGain(); bus.gain.value = 0.95; bus.connect(dry); bus.connect(rev);
+    const hit = (t, amp, bright) => {
+      // ostrý kovový „cink“ (pásmový šum)
+      const n = c.createBufferSource(); n.buffer = noiseBuf(0.12);
+      const bp = c.createBiquadFilter(); bp.type = 'bandpass'; bp.frequency.value = bright; bp.Q.value = 1.2;
+      const g = c.createGain(); g.gain.setValueAtTime(amp, t); g.gain.exponentialRampToValueAtTime(0.001, t + 0.1);
+      n.connect(bp).connect(g).connect(bus); n.start(t);
+    };
+    // 1) hlavní náraz: těžké žuchnutí + ostrý kov
     const o = c.createOscillator(), og = c.createGain();
-    o.type = 'sine'; o.frequency.setValueAtTime(75, t0); o.frequency.exponentialRampToValueAtTime(32, t0 + 0.35);
-    og.gain.setValueAtTime(1.0, t0); og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
-    o.connect(og).connect(out); o.start(t0); o.stop(t0 + 0.55);
-    const n = noise(0.25), nf = c.createBiquadFilter(), ng = c.createGain();
-    nf.type = 'lowpass'; nf.frequency.value = 900; ng.gain.setValueAtTime(0.9, t0); ng.gain.exponentialRampToValueAtTime(0.001, t0 + 0.22);
-    n.connect(nf).connect(ng).connect(out); n.start(t0);
-    // kovové zazvonění (neharmonické parciály oceli)
-    for (const [f, a, dcy] of [[196, 0.22, 1.6], [463, 0.16, 1.3], [811, 0.12, 1.1], [1247, 0.08, 0.9], [1890, 0.06, 0.7], [2733, 0.04, 0.5]]) {
-      const p2 = c.createOscillator(), pg = c.createGain();
-      p2.type = 'triangle'; p2.frequency.value = f * (0.995 + Math.random() * 0.01);
-      pg.gain.setValueAtTime(a, t0); pg.gain.exponentialRampToValueAtTime(0.0005, t0 + dcy);
-      p2.connect(pg).connect(out); p2.start(t0); p2.stop(t0 + dcy + 0.05);
+    o.type = 'sine'; o.frequency.setValueAtTime(95, t0); o.frequency.exponentialRampToValueAtTime(40, t0 + 0.25);
+    og.gain.setValueAtTime(0.9, t0); og.gain.exponentialRampToValueAtTime(0.001, t0 + 0.35);
+    o.connect(og).connect(bus); o.start(t0); o.stop(t0 + 0.4);
+    hit(t0, 1.0, 3200); hit(t0 + 0.004, 0.7, 1500);
+    // 2) zvonění ocelových tyčí: rozladěné dvojice → chvějivé záznějě, dlouhý dozvuk
+    for (const [f, a, dcy] of [[310, 0.16, 2.4], [523, 0.12, 2.0], [846, 0.1, 1.6], [1187, 0.07, 1.3], [1659, 0.05, 1.0], [2241, 0.035, 0.8], [3170, 0.02, 0.5]]) {
+      for (const det of [-1, 1]) {
+        const p2 = c.createOscillator(), pg = c.createGain();
+        p2.type = 'sine'; p2.frequency.value = f + det * (1.5 + f * 0.003);
+        pg.gain.setValueAtTime(0, t0); pg.gain.linearRampToValueAtTime(a, t0 + 0.004); pg.gain.exponentialRampToValueAtTime(0.0004, t0 + dcy);
+        p2.connect(pg).connect(bus); p2.start(t0); p2.stop(t0 + dcy + 0.05);
+      }
     }
-    // drnčení při odskocích mříže
-    for (const [dt, a] of [[0.13, 0.35], [0.24, 0.2], [0.31, 0.1]]) {
-      const r = noise(0.08), rf = c.createBiquadFilter(), rg = c.createGain();
-      rf.type = 'bandpass'; rf.frequency.value = 2600; rf.Q.value = 3;
-      rg.gain.setValueAtTime(a, t0 + dt); rg.gain.exponentialRampToValueAtTime(0.001, t0 + dt + 0.07);
-      r.connect(rf).connect(rg).connect(out); r.start(t0 + dt);
-    }
+    // 3) drnčení tyčí v rámu (rychlé opakované cinknutí)
+    for (let k = 0; k < 7; k++) hit(t0 + 0.05 + k * 0.035 + Math.random() * 0.01, 0.25 * (1 - k / 7), 2400 + Math.random() * 1200);
+    // 4) cvaknutí zámku
+    hit(t0 + 0.42, 0.5, 4200); hit(t0 + 0.47, 0.35, 2600);
+    const lo = c.createOscillator(), lg = c.createGain();
+    lo.type = 'square'; lo.frequency.value = 180; lg.gain.setValueAtTime(0.08, t0 + 0.42); lg.gain.exponentialRampToValueAtTime(0.001, t0 + 0.5);
+    lo.connect(lg).connect(bus); lo.start(t0 + 0.42); lo.stop(t0 + 0.52);
   } catch { /* bez zvuku */ }
 }
 // mříž na úvodu: zvuk v okamžiku dopadu; kliknutím na nápis se celý efekt přehraje znovu (i se zvukem)

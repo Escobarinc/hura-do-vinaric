@@ -5,15 +5,16 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127192302';
-import { Crowd } from './crowd.js?v=20261127192302';
-import { PrisonFX } from './prisonfx.js?v=20261127192302';
+import { makeHuman, animateHuman } from './entities.js?v=20261127194543';
+import { Crowd } from './crowd.js?v=20261127194543';
+import { PrisonFX } from './prisonfx.js?v=20261127194543';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
 const DECK = 0.9; // výška podlahy
 const ROUND_S = 60, REST_S = 8;
-const CARPET_A = Math.PI * 0.82; // směr uličky s kobercem
+const CARPET_A = Math.PI * 0.82; // směr nástupu bachařů (vězni přicházejí z opačné strany)
+const ENTRY_A = { blue: CARPET_A, red: CARPET_A + Math.PI };
 const VOICE = { // hlášky hlasatelky (nahrané, hrají i na telefonu)
   intro: 'mma_intro', intro3: 'mma_intro3', red: 'mma_red', red_you: 'mma_red_you', red3: 'mma_red3', rules: 'mma_rules',
   r1: 'mma_r1', r2: 'mma_r2', r3: 'mma_r3', e1: 'mma_e1', e2: 'mma_e2',
@@ -56,16 +57,13 @@ export class MMA {
     // vrcholy osmiúhelníku (stejně jako CylinderGeometry: úhel 0 míří na +z)
     this.verts = [];
     for (let k = 0; k < 8; k++) { const a = (k / 8) * Math.PI * 2; this.verts.push([C.x + Math.sin(a) * R, C.z + Math.cos(a) * R]); }
-    let door = 0, bd = 9;
-    for (let k = 0; k < 8; k++) {
-      const [ax, az] = this.verts[k], [bx, bz] = this.verts[(k + 1) % 8], mx = (ax + bx) / 2 - C.x, mz = (az + bz) / 2 - C.z;
-      const a = Math.atan2(mz, mx), d = Math.abs(Math.atan2(Math.sin(a - CARPET_A), Math.cos(a - CARPET_A)));
-      if (d < bd) { bd = d; door = k; }
-    }
+    const sideFor = (ang) => { let door = 0, bd = 9; for (let k = 0; k < 8; k++) { const [ax, az] = this.verts[k], [bx, bz] = this.verts[(k + 1) % 8], mx = (ax + bx) / 2 - C.x, mz = (az + bz) / 2 - C.z; const a2 = Math.atan2(mz, mx), d = Math.abs(Math.atan2(Math.sin(a2 - ang), Math.cos(a2 - ang))); if (d < bd) { bd = d; door = k; } } return door; };
+    const doorSide = { blue: sideFor(ENTRY_A.blue), red: sideFor(ENTRY_A.red) };
+    const isDoorSide = (k) => k === doorSide.blue || k === doorSide.red;
     for (let k = 0; k < 8; k++) {
       const [ax, az] = this.verts[k], [bx, bz] = this.verts[(k + 1) % 8], L = Math.hypot(bx - ax, bz - az);
       const rot = Math.atan2(bx - ax, bz - az) - Math.PI / 2;
-      const isDoor = k === door, w = isDoor ? L * 0.45 : L;
+      const isDoor = isDoorSide(k), w = isDoor ? L * 0.45 : L;
       const mx = isDoor ? ax + (bx - ax) * 0.775 : (ax + bx) / 2, mz = isDoor ? az + (bz - az) * 0.775 : (az + bz) / 2;
       const pm = new THREE.MeshStandardMaterial({ map: mt.clone(), alphaTest: 0.3, transparent: true, side: THREE.DoubleSide, roughness: 0.6 });
       pm.map.needsUpdate = true; pm.map.repeat.set(w / 0.35, H / 0.35);
@@ -74,40 +72,60 @@ export class MMA {
       const post = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.12, H + 0.4, 10), k === 1 ? padBlue : k === 5 ? padRed : pad);
       post.position.set(ax, top + (H + 0.4) / 2, az); g.add(post);
     }
-    const [dax, daz] = this.verts[door], [dbx, dbz] = this.verts[(door + 1) % 8];
-    const dmx = dax + (dbx - dax) * 0.27, dmz = daz + (dbz - daz) * 0.27, ux0 = dmx - C.x, uz0 = dmz - C.z, ul = Math.hypot(ux0, uz0);
-    const ux = ux0 / ul, uz = uz0 / ul;
-    this.doorPt = [C.x + ux * (ul - 0.3), C.z + uz * (ul - 0.3)];
-    const stepM = mat('#262626');
-    for (let s = 0; s < 4; s++) {
-      const st = new THREE.Mesh(new THREE.BoxGeometry(1.5, DECK * (s + 1) / 4, 0.42), stepM);
-      const d = ul + 0.25 + (3 - s) * 0.42;
-      st.position.set(C.x + ux * d, gy + (DECK * (s + 1) / 4) / 2, C.z + uz * d); st.rotation.y = Math.atan2(ux, uz); g.add(st);
+    // dva nástupy: bachaři (modrá brána) a vězni (červená brána) z opačných stran
+    this.cageDoors = []; this.entries = {};
+    const stepM = mat('#262626'), brass = mat('#c9a43a', { metalness: 0.8, roughness: 0.3 }), archM = mat('#111');
+    for (const team of ['blue', 'red']) {
+      const door = doorSide[team];
+      const [dax, daz] = this.verts[door], [dbx, dbz] = this.verts[(door + 1) % 8];
+      { // dveře klece (otevřené ven, po odchodu moderátora se zavřou)
+        const L = Math.hypot(dbx - dax, dbz - daz), w = L * 0.55, rot = Math.atan2(dbx - dax, dbz - daz) - Math.PI / 2;
+        const pm = new THREE.MeshStandardMaterial({ map: mt.clone(), alphaTest: 0.3, transparent: true, side: THREE.DoubleSide, roughness: 0.6 });
+        pm.map.needsUpdate = true; pm.map.repeat.set(w / 0.35, H / 0.35);
+        const pivot = new THREE.Group(); pivot.position.set(dax, top, daz); pivot.rotation.y = rot;
+        const leaf = new THREE.Mesh(new THREE.PlaneGeometry(w, H), pm); leaf.position.set(w / 2, H / 2, 0);
+        const frame = new THREE.Mesh(new THREE.BoxGeometry(w, 0.1, 0.08), pad); frame.position.set(w / 2, H, 0);
+        const frame2 = frame.clone(); frame2.position.y = 0.05;
+        const handle = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.25, 0.12), mat('#c9a43a', { metalness: 0.8 })); handle.position.set(w - 0.12, H * 0.5, 0.05);
+        pivot.add(leaf, frame, frame2, handle); g.add(pivot);
+        pivot.rotateY(1.45);
+        this.cageDoors.push({ pivot, cur: 1.45 });
+      }
+      const dmx = dax + (dbx - dax) * 0.27, dmz = daz + (dbz - daz) * 0.27, ux0 = dmx - C.x, uz0 = dmz - C.z, ul = Math.hypot(ux0, uz0);
+      const ux = ux0 / ul, uz = uz0 / ul;
+      const E = { ux, uz };
+      E.doorPt = [C.x + ux * (ul - 0.3), C.z + uz * (ul - 0.3)];
+      for (let s2 = 0; s2 < 4; s2++) {
+        const st = new THREE.Mesh(new THREE.BoxGeometry(1.5, DECK * (s2 + 1) / 4, 0.42), stepM);
+        const d = ul + 0.25 + (3 - s2) * 0.42;
+        st.position.set(C.x + ux * d, gy + (DECK * (s2 + 1) / 4) / 2, C.z + uz * d); st.rotation.y = Math.atan2(ux, uz); g.add(st);
+      }
+      E.stairFoot = [C.x + ux * (ul + 2.1), C.z + uz * (ul + 2.1)];
+      E.stairTop = [C.x + ux * (ul + 0.2), C.z + uz * (ul + 0.2)];
+      const carpetLen = 12;
+      E.carpetStart = [E.stairFoot[0] + ux * carpetLen, E.stairFoot[1] + uz * carpetLen];
+      const carpet = new THREE.Mesh(new THREE.PlaneGeometry(1.6, carpetLen), mat(team === 'blue' ? '#13307a' : '#9c1010', { roughness: 0.95 }));
+      carpet.rotation.order = 'YXZ'; carpet.rotation.y = Math.atan2(ux, uz); carpet.rotation.x = -Math.PI / 2;
+      carpet.position.set((E.stairFoot[0] + E.carpetStart[0]) / 2, gy + 0.03, (E.stairFoot[1] + E.carpetStart[1]) / 2);
+      g.add(carpet);
+      for (const sd of [-1, 1]) for (let k = 0; k <= 5; k++) {
+        const d = (k / 5) * carpetLen, px = E.stairFoot[0] + ux * d - uz * sd * 1.1, pz = E.stairFoot[1] + uz * d + ux * sd * 1.1;
+        const p2 = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 1.0, 8), brass); p2.position.set(px, gy + 0.5, pz); g.add(p2);
+      }
+      const arch = new THREE.Group();
+      for (const sd of [-1, 1]) { const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.3, 0.3), archM); col.position.set(sd * 1.5, 1.65, 0); arch.add(col); }
+      const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
+      const sg = sc.getContext('2d'); sg.fillStyle = team === 'blue' ? '#0b1a44' : '#3a0707'; sg.fillRect(0, 0, 512, 128); sg.fillStyle = team === 'blue' ? '#7fb2ff' : '#ff7a6a'; sg.font = 'bold 60px sans-serif'; sg.textAlign = 'center'; sg.fillText(team === 'blue' ? 'BACHAŘI' : 'VĚZNI', 256, 86);
+      const stx = new THREE.CanvasTexture(sc); stx.colorSpace = THREE.SRGBColorSpace;
+      const signM = new THREE.MeshStandardMaterial({ map: stx, emissive: '#ffffff', emissiveMap: stx, emissiveIntensity: 0.7 });
+      const sign = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.85, 0.2), [archM, archM, archM, archM, signM, signM]); sign.position.y = 3.4; arch.add(sign);
+      arch.position.set(E.carpetStart[0], gy, E.carpetStart[1]); arch.rotation.y = Math.atan2(ux, uz);
+      g.add(arch);
+      this.entries[team] = E;
     }
-    this.stairFoot = [C.x + ux * (ul + 2.1), C.z + uz * (ul + 2.1)];
-    this.stairTop = [C.x + ux * (ul + 0.2), C.z + uz * (ul + 0.2)];
-    // červený koberec, sloupky s lanem, vstupní brána
-    const carpetLen = 13;
-    this.carpetStart = [this.stairFoot[0] + ux * carpetLen, this.stairFoot[1] + uz * carpetLen];
-    const carpet = new THREE.Mesh(new THREE.PlaneGeometry(1.6, carpetLen), mat('#9c1010', { roughness: 0.95 }));
-    carpet.rotation.set(-Math.PI / 2, 0, -Math.atan2(ux, uz) + Math.PI, 'YXZ');
-    carpet.rotation.order = 'YXZ'; carpet.rotation.y = Math.atan2(ux, uz); carpet.rotation.x = -Math.PI / 2; carpet.rotation.z = 0;
-    carpet.position.set((this.stairFoot[0] + this.carpetStart[0]) / 2, gy + 0.03, (this.stairFoot[1] + this.carpetStart[1]) / 2);
-    g.add(carpet);
-    const brass = mat('#c9a43a', { metalness: 0.8, roughness: 0.3 });
-    for (const sd of [-1, 1]) for (let k = 0; k <= 5; k++) {
-      const d = (k / 5) * carpetLen, px = this.stairFoot[0] + ux * d - uz * sd * 1.1, pz = this.stairFoot[1] + uz * d + ux * sd * 1.1;
-      const p = new THREE.Mesh(new THREE.CylinderGeometry(0.04, 0.06, 1.0, 8), brass); p.position.set(px, gy + 0.5, pz); g.add(p);
-    }
-    const arch = new THREE.Group(), archM = mat('#111');
-    for (const sd of [-1, 1]) { const col = new THREE.Mesh(new THREE.BoxGeometry(0.3, 3.3, 0.3), archM); col.position.set(sd * 1.5, 1.65, 0); arch.add(col); }
-    const sc = document.createElement('canvas'); sc.width = 512; sc.height = 128;
-    const sg = sc.getContext('2d'); sg.fillStyle = '#0d0d0d'; sg.fillRect(0, 0, 512, 128); sg.fillStyle = '#f0c53a'; sg.font = 'bold 52px sans-serif'; sg.textAlign = 'center'; sg.fillText('BACHAŘI vs VĚZNI', 256, 82);
-    const stx = new THREE.CanvasTexture(sc); stx.colorSpace = THREE.SRGBColorSpace;
-    const signM = new THREE.MeshStandardMaterial({ map: stx, emissive: '#ffffff', emissiveMap: stx, emissiveIntensity: 0.6 });
-    const sign = new THREE.Mesh(new THREE.BoxGeometry(3.4, 0.85, 0.2), [archM, archM, archM, archM, signM, signM]); sign.position.y = 3.4; arch.add(sign);
-    arch.position.set(this.carpetStart[0], gy, this.carpetStart[1]); arch.rotation.y = Math.atan2(ux, uz);
-    g.add(arch);
+    // zpětná kompatibilita (moderátor, konec zápasu) = modrá brána
+    Object.assign(this, { doorPt: this.entries.blue.doorPt, stairTop: this.entries.blue.stairTop, stairFoot: this.entries.blue.stairFoot, carpetStart: this.entries.blue.carpetStart });
+    const ux = this.entries.blue.ux, uz = this.entries.blue.uz;
     // osvětlení jako na turnaji: stožáry s reflektory, kužely světla, barevné lasery, hlavní světlo nad klecí
     this.beams = []; this.lasers = [];
     const coneM = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
@@ -132,10 +150,13 @@ export class MMA {
     for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2 + 0.3; const l = new THREE.PointLight('#fff1d6', 45, 30, 1.3); l.position.set(C.x + Math.cos(a) * 15, gy + 8.5, C.z + Math.sin(a) * 15); g.add(l); }
     this.colorLights = ['#ff3355', '#3388ff'].map((c, i) => { const l = new THREE.PointLight(c, 18, 26, 1.6); l.position.set(C.x + (i ? 6 : -6), gy + 6, C.z); g.add(l); return l; });
     scene.add(g);
+    // dočasně schovat drobnosti v prostoru arény
+    this.hidden = [];
+    for (const pr of city.props || []) if (Math.hypot(pr.x - C.x, pr.z - C.z) < 22 && pr.obj.visible) { pr.obj.visible = false; this.hidden.push(pr); if (pr.obst) { pr._r = pr.obst.r; pr.obst.r = 0; } }
     // fanoušci: 500 vězňů kolem klece (mimo uličku)
     this.crowd = new Crowd(scene, { capacity: 500, shirt: '#3f4f63', pants: '#34404f' });
     this.fans = [];
-    const aisle = (a, rr) => Math.abs(Math.atan2(Math.sin(a - CARPET_A), Math.cos(a - CARPET_A))) < 0.25 + 1.5 / rr;
+    const aisle = (a, rr) => [ENTRY_A.blue, ENTRY_A.red].some((A) => Math.abs(Math.atan2(Math.sin(a - A), Math.cos(a - A))) < 0.25 + 1.5 / rr);
     let n = 0;
     for (let ring = 0; n < 500 && ring < 14; ring++) {
       const rr = 8.6 + ring * 0.8, cnt = Math.floor((2 * Math.PI * rr) / 0.75);
@@ -143,6 +164,7 @@ export class MMA {
         const a = (k / cnt) * Math.PI * 2 + (ring % 2) * 0.2;
         if (aisle(a, rr)) continue;
         const x = C.x + Math.cos(a) * rr + (Math.random() - 0.5) * 0.3, z = C.z + Math.sin(a) * rr + (Math.random() - 0.5) * 0.3;
+        if (city.collide(x, z, 0.35).hit || city.buildingAt(x, z)) continue; // ne do zdi / budovy
         this.fans.push({ i: n++, x, z, y: city.ground(x, z), h: Math.atan2(C.x - x, C.z - z), ph: Math.random() * 6, hype: Math.random() });
       }
     }
@@ -165,9 +187,6 @@ export class MMA {
       const dog = G.prisonFx?.makeDog?.();
       if (dog) { const dx = x + Math.cos(h) * 0.8, dz = z - Math.sin(h) * 0.8; dog.position.set(dx, city.ground(dx, dz), dz); dog.rotation.y = h; this.dogs.push({ m: dog, ph: Math.random() * 6 }); }
     }
-    // dočasně schovat drobnosti v prostoru arény
-    this.hidden = [];
-    for (const pr of city.props || []) if (Math.hypot(pr.x - C.x, pr.z - C.z) < 22 && pr.obj.visible) { pr.obj.visible = false; this.hidden.push(pr); if (pr.obst) { pr._r = pr.obst.r; pr.obst.r = 0; } }
     this.pools = [];
   }
 
@@ -214,7 +233,7 @@ export class MMA {
     this.team = mode === 'team' || mode === 'teamPlay';
     G.setHour = 21; // turnaje jsou vždy večer, za tmy
     G.wanted = 0;
-    this.cinematic = !this.playAs ? false : true; // divák: normální pohled ze hry (V = kamera arény)
+    this.cinematic = true; // úvod (oktagon, nástup, moderátor) vždy kamerou arény; divák pak dostane zpět pohled ze hry
     if (this.playAs) { if (G.vehicle) G.exit?.(); G.mode = 'mma'; G.player.mesh.visible = false; }
     const N = this.team ? 3 : 1;
     const guardNames = ['Bachař Novák', 'Bachař Dvořák', 'Bachař Černý'], conNames = ['Vězeň „Kladivo“', 'Vězeň „Žiletka“', 'Vězeň „Tank“'];
@@ -228,22 +247,76 @@ export class MMA {
     document.body.classList.toggle('mma-play', this.playAs);
     this.all = [...this.blue, ...this.red];
     this.ref = this.fighter({ name: 'Suit_Male', uniform: { shirt: '#f4f4f2', pants: '#141414' } }, 'Rozhodčí', null);
-    this.place(this.ref, C.x, C.z, Math.PI); this.ref.y = this.deckTop; this.ref.m.position.y = this.ref.y;
+    // rozhodčí čeká u neutrálního rohu, uprostřed stojí moderátor s mikrofonem
+    { const a = (3 / 8) * Math.PI * 2, rx = C.x + Math.sin(a) * (R - 1.2), rz = C.z + Math.cos(a) * (R - 1.2); this.place(this.ref, rx, rz, Math.atan2(C.x - rx, C.z - rz)); this.ref.y = this.deckTop; this.ref.m.position.y = this.ref.y; }
+    this.mc = this.fighter({ name: 'Suit_Male', uniform: { shirt: '#111318', pants: '#111318' }, skin: '#e8c3a0' }, 'Moderátor', null);
+    this.place(this.mc, C.x, C.z, Math.atan2(this.doorPt[0] - C.x, this.doorPt[1] - C.z)); this.mc.y = this.deckTop; this.mc.m.position.y = this.mc.y;
+    this.dressMc(this.mc);
+    this.mc.path = [[this.doorPt[0], this.doorPt[1]], [this.stairTop[0], this.stairTop[1]], [this.stairFoot[0], this.stairFoot[1]], [this.carpetStart[0], this.carpetStart[1]]]; this.mc.pi = 0; this.mc.leaving = false;
+    this.musicDone = false; this.music = null;
     // nástupní trasy: koberec → schůdky → vstup → roh (bachaři modrý roh, vězni červený)
     const corner = (team, k) => { const a = (team === 'blue' ? 1 : 5) / 8 * Math.PI * 2, cx = C.x + Math.sin(a) * (R - 1.3), cz = C.z + Math.cos(a) * (R - 1.3); return [cx + (k - (N - 1) / 2) * 1.0 * Math.cos(a), cz - (k - (N - 1) / 2) * 1.0 * Math.sin(a)]; };
     for (const [list, team] of [[this.blue, 'blue'], [this.red, 'red']]) list.forEach((f, k) => {
       const [cx, cz] = corner(team, k);
-      f.path = [[this.stairFoot[0], this.stairFoot[1]], [this.stairTop[0], this.stairTop[1]], [this.doorPt[0], this.doorPt[1]], [cx, cz]];
+      const E = this.entries[team];
+      f.entry = E;
+      f.path = [[E.stairFoot[0], E.stairFoot[1]], [E.stairTop[0], E.stairTop[1]], [E.doorPt[0], E.doorPt[1]], [cx, cz]];
       f.pi = 0; f.delay = k * 0.8; f.corner = [cx, cz];
-      this.place(f, this.carpetStart[0], this.carpetStart[1], 0); f.m.visible = false;
+      this.place(f, E.carpetStart[0], E.carpetStart[1], 0); f.m.visible = false;
     });
-    this.phase = 'walkBlue'; this.t = 0; this.round = 0; this.clock = ROUND_S;
+    this.phase = 'show'; this.t = 0; this.round = 0; this.clock = ROUND_S; // 1) nejdřív se ukáže oktagon
     this.makeHud();
-    this.say(this.team ? 'intro3' : 'intro', this.team ? 'Vítejte na Vinařice Fight Night! Tři na tři! V modrém rohu… tým bachařů!' : 'Vítejte na Vinařice Fight Night! V modrém rohu… bachař Novák!');
+    this.status = '🎵 Nástup zápasníků';
     G.toast?.(this.playAs ? '🥊 Hraješ za vězně · WASD · myš / F rána · G / Q kop · Shift kryt · O nůž' : '🥊 MMA zápas za tmy · V = kamera arény / pohled ze hry');
     this.knife = null;
   }
 
+  /** Moderátor: černý oblek, bílá košile, motýlek, mikrofon v pravé ruce. */
+  dressMc(f) {
+    const m = f.m; m.updateMatrixWorld(true);
+    const at = (bone, obj, y = 0) => { if (!bone) return; const ws = new THREE.Vector3(); bone.getWorldScale(ws); const k = 1 / (ws.x || 1); obj.scale.setScalar(k); obj.position.y = y * k; bone.add(obj); };
+    const mic = new THREE.Group();
+    const handle = new THREE.Mesh(new THREE.CylinderGeometry(0.018, 0.014, 0.2, 10), new THREE.MeshStandardMaterial({ color: '#1a1a1a', metalness: 0.6, roughness: 0.3 }));
+    const head = new THREE.Mesh(new THREE.SphereGeometry(0.035, 14, 10), new THREE.MeshStandardMaterial({ color: '#b9bec4', metalness: 0.9, roughness: 0.35 }));
+    head.position.y = 0.12;
+    const ring = new THREE.Mesh(new THREE.TorusGeometry(0.024, 0.006, 6, 14), new THREE.MeshStandardMaterial({ color: '#39ff14', emissive: '#39ff14', emissiveIntensity: 0.8 }));
+    ring.rotation.x = Math.PI / 2; ring.position.y = 0.075;
+    mic.add(handle, head, ring); mic.rotation.x = -0.4;
+    at(f.bones.fistR, mic, 0.04);
+    // motýlek a bílá náprsenka
+    let neck = null; m.traverse((o) => { if (!neck && (o.name === 'Neck' || o.name === 'neck')) neck = o; });
+    if (neck) {
+      const tie = new THREE.Group(), red = new THREE.MeshStandardMaterial({ color: '#d41f2c', roughness: 0.5 });
+      for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.ConeGeometry(0.03, 0.06, 4), red); w.rotation.z = sd * Math.PI / 2; w.position.x = sd * 0.03; tie.add(w); }
+      tie.position.z = 0.09; at(neck, tie, -0.02);
+    }
+  }
+  /** Moderátor: uprostřed klece hlásí nástup (mikrofon u pusy), pak odchází z klece. */
+  mcStep(dt) {
+    const f = this.mc; if (!f || f.gone) return;
+    if (!f.leaving) {
+      f.m.position.set(f.x, f.y, f.z);
+      const tgt = this.phase === 'walkRed' ? this.red[0] : this.blue[0];
+      if (tgt?.m.visible) f.h += Math.atan2(Math.sin(Math.atan2(tgt.x - f.x, tgt.z - f.z) - f.h), Math.cos(Math.atan2(tgt.x - f.x, tgt.z - f.z) - f.h)) * Math.min(1, dt * 3);
+      f.m.rotation.y = f.h;
+      animateHuman(f.m, 0, dt);
+      // mikrofon u pusy, volná ruka gestikuluje
+      if (f.bones.uaR) { f.bones.uaR.rotation.x -= 1.25; f.bones.uaR.rotation.z += 0.55; }
+      if (f.bones.uaL) f.bones.uaL.rotation.x -= 0.6 + Math.max(0, Math.sin(this.game.time * 3)) * 0.9;
+      return;
+    }
+    const p = f.path[f.pi];
+    if (!p) { f.gone = true; this.game.scene.remove(f.m); return; }
+    const dx = p[0] - f.x, dz = p[1] - f.z, d = Math.hypot(dx, dz), v = 2.2;
+    if (d < 0.15) { f.pi++; return; }
+    const st = Math.min(d, v * dt); f.x += (dx / d) * st; f.z += (dz / d) * st; f.h = Math.atan2(dx, dz);
+    const gy = this.game.city.ground(f.x, f.z);
+    f.y = f.pi === 0 ? this.deckTop : f.pi === 1 ? gy + DECK * Math.max(0, Math.min(1, 1 - Math.hypot(f.x - this.stairTop[0], f.z - this.stairTop[1]) / 1.9)) : gy;
+    if (f.pi >= 2) f.y = gy;
+    f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = f.h;
+    animateHuman(f.m, v, dt);
+    if (f.bones.uaR) { f.bones.uaR.rotation.x -= 0.5; }
+  }
   place(f, x, z, h) { f.x = x; f.z = z; f.h = h; f.y = this.game.city.ground(x, z); f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = h; }
 
   /** Hlasatelka: nahraná hláška (key), jinak hlas prohlížeče. */
@@ -277,7 +350,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     b.addEventListener('click', (e) => { e.stopPropagation(); this.finish(); });
     document.body.appendChild(b); this.endBtn = b;
     if (!this.playAs) {
-      const c = document.createElement('button'); c.id = 'mma-cam'; c.textContent = '🎥 Kamera arény (V)';
+      const c = document.createElement('button'); c.id = 'mma-cam'; c.textContent = this.cinematic ? '🎮 Pohled ze hry (V)' : '🎥 Kamera arény (V)';
       c.style.cssText = 'position:fixed;right:16px;bottom:62px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:rgba(14,18,23,.85);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 14px;cursor:pointer';
       c.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCam(); c.blur(); });
       document.body.appendChild(c); this.camBtn = c;
@@ -324,18 +397,27 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     if (!this.playAs && this.game.input.hit('KeyV')) this.toggleCam();
     this.t += dt;
     const ph = this.phase;
-    if (ph === 'walkBlue' || ph === 'walkRed') {
-      const list = ph === 'walkBlue' ? this.blue : this.red;
+    if (ph === 'show') {
+      // 1) oktagon se ukáže, moderátor stojí uprostřed
+      this.status = 'Vinařice Fight Night';
+      if (this.t > 4) { this.phase = 'walkAll'; this.t = 0; this.status = 'Nástup zápasníků'; }
+    } else if (ph === 'walkAll' || ph === 'walkBlue' || ph === 'walkRed') {
+      // 2) zápasníci přicházejí ze dvou stran (bachaři modrou bránou, vězni červenou)
       let done = true;
-      for (const f of list) { if (this.walk(f, dt) === false) done = false; }
-      for (const f of this.all) if (!list.includes(f) && f.m.visible) this.idle(f, dt);
+      for (const f of this.all) { if (this.walk(f, dt) === false) done = false; }
       if (done) {
-        if (ph === 'walkBlue') {
-          this.phase = 'walkRed'; this.t = 0;
-          if (this.team) this.say('red3', 'A v červeném rohu… tým vězňů!');
-          else if (this.playAs) this.say('red_you', 'A v červeném rohu… vyzyvatel z oddílu K… TY!');
-          else this.say('red', 'A v červeném rohu… vězeň Kladivo!');
-        } else { this.phase = 'intro'; this.t = 0; this.say('rules', 'Pravidla znáte. Pěsti a kopy. Ťukněte si… a bojujte!'); }
+        // 3) všichni v ringu → moderátor: „Jedeme bomby!“
+        this.phase = 'announce'; this.t = 0; this.status = '🎤 Jedeme bomby!';
+        try { this.music = new Audio('assets/audio/jedeme-bomby.mp3'); this.music.volume = 0.9; this.music.addEventListener('ended', () => (this.musicDone = true)); this.music.play().catch(() => { this.musicDone = true; }); } catch { this.musicDone = true; }
+      }
+    } else if (ph === 'announce') {
+      // písnička dohraje → moderátor odchází → zavřou se dveře → rozhodčí
+      for (const f of this.all) { const o = this.nearestFoe(f); if (o) f.h = Math.atan2(o.x - f.x, o.z - f.z); this.idle(f, dt); }
+      if ((this.musicDone || this.t > 16) && this.t > 2 && this.mc && !this.mc.leaving) { this.mc.leaving = true; this.status = 'Moderátor opouští klec'; }
+      if (this.mc?.leaving && (this.mc.gone || this.mc.pi >= 2)) {
+        let open = false;
+        for (const D of this.cageDoors || []) if (D.cur > 0) { open = true; const st = Math.min(D.cur, dt * 2.2); D.pivot.rotateY(-st); D.cur -= st; if (D.cur <= 0) { this.game.audio?.noise?.(0.25, 0.8, 300); this.game.audio?.blip?.(140, 0.2, 'square', 0.1, -40); } }
+        if (!open) { this.phase = 'intro'; this.t = 0; this.status = ''; if (!this.playAs && this.cinematic) this.toggleCam(); this.say('rules', 'Pravidla znáte. Pěsti a kopy. Ťukněte si… a bojujte!'); }
       }
     } else if (ph === 'intro') {
       for (const f of this.all) { const o = this.nearestFoe(f); if (o) f.h = Math.atan2(o.x - f.x, o.z - f.z); this.idle(f, dt); }
@@ -361,11 +443,16 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       if (this.t > 16) this.finish();
     }
     this.refStep(dt);
+    this.mcStep(dt);
     this.updateFans(dt);
     this.updateLights(dt);
     this.updateHud();
   }
 
+  fadeMusic() {
+    const a = this.music; if (!a) return;
+    const id = setInterval(() => { a.volume = Math.max(0, a.volume - 0.06); if (a.volume <= 0.01) { a.pause(); clearInterval(id); } }, 120);
+  }
   startRound(n) {
     this.round = n; this.clock = ROUND_S; this.phase = 'fight'; this.t = 0;
     for (const f of this.all) if (f.act !== 'ko') { f.act = 'idle'; f.cool = 0.6 + Math.random() * 0.8; }
@@ -392,7 +479,8 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     f.x += (dx / d) * s; f.z += (dz / d) * s; f.h = Math.atan2(dx, dz);
     // výška: koberec = zem, schůdky = plynule, uvnitř = podlaha
     const gy = this.game.city.ground(f.x, f.z);
-    if (f.pi === 0) f.y = gy; else if (f.pi === 1) { const t = 1 - Math.hypot(this.stairTop[0] - f.x, this.stairTop[1] - f.z) / 1.9; f.y = gy + DECK * Math.max(0, Math.min(1, t)); } else f.y = this.deckTop;
+    const ST = (f.entry || this).stairTop;
+    if (f.pi === 0) f.y = gy; else if (f.pi === 1) { const t = 1 - Math.hypot(ST[0] - f.x, ST[1] - f.z) / 1.9; f.y = gy + DECK * Math.max(0, Math.min(1, t)); } else f.y = this.deckTop;
     f.m.position.set(f.x, f.y, f.z); f.m.rotation.y = f.h;
     animateHuman(f.m, v, dt); this.applyPose(f, true);
     return false;
@@ -431,6 +519,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     let mv = 0, mx = 0, mz = 0;
     if (f.act === 'hit') { if (f.actT > 0.38) f.act = 'idle'; }
     else if (f.act === 'punch' || f.act === 'kick' || f.act === 'stab') {
+      // výpad vpřed při úderu (a návrat)
+      const lt = f.actT / (f.act === 'kick' ? 0.62 : 0.42), lv = lt < 0.35 ? 1.6 : lt < 0.8 ? -0.9 : 0;
+      f.x += (dx / d) * lv * dt; f.z += (dz / d) * lv * dt;
       const impact = f.act === 'kick' ? 0.3 : 0.17, end = f.act === 'kick' ? 0.62 : 0.42, reach = f.act === 'kick' ? 1.7 : f.act === 'stab' ? 1.3 : 1.35;
       if (!f.hitDone && f.actT >= impact) { f.hitDone = true; this.resolve(f, o, f.act, reach); }
       if (f.actT > end) f.act = 'idle';
@@ -468,7 +559,8 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
   }
   attack(f, kind, cool) {
     f.act = kind; f.actT = 0; f.hitDone = false; f.cool = cool;
-    if (kind !== 'kick') f.m.userData.punchNew = true; else f.kickN++;
+    if (kind !== 'kick') { f.m.userData.punchNew = true; f.arm = f.arm === 'L' ? 'R' : 'L'; } else f.kickN++;
+    f.lunge = 0;
     this.game.audio?.noise?.(0.05, 0.12, 1800);
   }
   resolve(f, o, kind, reach) {
@@ -484,7 +576,11 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     o.hp -= dmg; f.landed++;
     o.act = 'hit'; o.actT = 0;
     const ux = dx / (d || 1), uz = dz / (d || 1);
-    o.x += ux * (kind === 'kick' ? 0.45 : 0.28); o.z += uz * (kind === 'kick' ? 0.45 : 0.28);
+    o.x += ux * (kind === 'kick' ? 0.6 : 0.4); o.z += uz * (kind === 'kick' ? 0.6 : 0.4);
+    const hy = o.y + (kind === 'kick' ? (f.kickN % 2 ? 1.0 : 1.45) : 1.55);
+    this.impact(o.x - ux * 0.25, hy, o.z - uz * 0.25, dmg >= 9 || kind === 'kick');
+    this.flashBody(o);
+    this.shake = Math.max(this.shake || 0, dmg / 30);
     const G = this.game;
     G.audio?.noise?.(0.08, kind === 'kick' ? 0.9 : 0.7, kind === 'kick' ? 260 : 340);
     G.audio?.blip?.(80, 0.08, 'square', 0.1, -30);
@@ -548,18 +644,50 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
   /** Garda, kopy, reakce na zásah, oslava – natočení kostí po přehrání klipu. */
   applyPose(f, walking) {
     const B = f.bones;
-    if (f === this.ref) return;
-    if (!walking && f.act !== 'punch' && f.act !== 'stab' && f.act !== 'win') {
+    if (f === this.ref || f === this.mc) return;
+    const punching = f.act === 'punch' || f.act === 'stab';
+    if (!walking && !punching && f.act !== 'win') {
       if (B.uaL) { B.uaL.rotation.x -= 0.9; B.uaL.rotation.z += f.block ? 0.5 : 0.25; }
       if (B.uaR) { B.uaR.rotation.x -= 0.9; B.uaR.rotation.z -= f.block ? 0.5 : 0.25; }
     }
+    if (punching) {
+      // úder: paže vystřelí vpřed (rychle tam, pomaleji zpět), trup se protočí, druhá ruka kryje bradu
+      const t = f.actT / 0.42, k = t < 0.35 ? t / 0.35 : Math.max(0, 1 - (t - 0.35) / 0.65);
+      const hit = f.arm === 'L' ? B.uaL : B.uaR, guard = f.arm === 'L' ? B.uaR : B.uaL;
+      if (hit) { hit.rotation.x -= 0.9 + 0.85 * k; hit.rotation.z += (f.arm === 'L' ? -0.25 : 0.25) * k; }
+      if (guard) { guard.rotation.x -= 1.0; guard.rotation.z += f.arm === 'L' ? -0.4 : 0.4; }
+      if (B.torso) { B.torso.rotation.y += (f.arm === 'L' ? -0.55 : 0.55) * k; B.torso.rotation.x += 0.18 * k; }
+    }
     if (f.act === 'kick' && B.ulR) {
       const k = Math.sin(Math.min(1, f.actT / 0.62) * Math.PI);
-      B.ulR.rotation.x -= k * 1.5; if (B.llR) B.llR.rotation.x += k * (f.kickN % 2 ? 0.2 : 0.9);
-      if (B.torso) B.torso.rotation.x += k * 0.25;
+      B.ulR.rotation.x -= k * 1.9; if (B.llR) B.llR.rotation.x += k * (f.kickN % 2 ? 0.1 : 0.7);
+      if (B.torso) { B.torso.rotation.x -= k * 0.25; B.torso.rotation.y += k * 0.4; }
     }
-    if (f.act === 'hit' && B.torso) B.torso.rotation.x += Math.sin(Math.min(1, f.actT / 0.38) * Math.PI) * 0.45;
+    if (f.act === 'hit' && B.torso) {
+      // zásah: hlava a trup odletí dozadu, ruce rozhozené
+      const k = Math.sin(Math.min(1, f.actT / 0.38) * Math.PI);
+      B.torso.rotation.x -= k * 0.85; B.torso.rotation.z += k * 0.25 * (f.x > 0 ? 1 : -1);
+      if (B.uaL) B.uaL.rotation.z += k * 0.6; if (B.uaR) B.uaR.rotation.z -= k * 0.6;
+    }
     if (f.act === 'win') { if (B.uaL) B.uaL.rotation.x -= 2.6; if (B.uaR) B.uaR.rotation.x -= 2.6; }
+  }
+  /** Záblesk zásahu: bílo-žlutý výbuch světla, jiskry a kapky potu v místě úderu. */
+  impact(x, y, z, big) {
+    const G = this.game;
+    this.impT ||= (() => { const c = document.createElement('canvas'); c.width = c.height = 128; const g = c.getContext('2d'); const gr = g.createRadialGradient(64, 64, 0, 64, 64, 64); gr.addColorStop(0, 'rgba(255,255,255,1)'); gr.addColorStop(0.25, 'rgba(255,240,150,.95)'); gr.addColorStop(0.6, 'rgba(255,170,40,.35)'); gr.addColorStop(1, 'rgba(255,120,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 128, 128); g.strokeStyle = 'rgba(255,255,255,.9)'; g.lineWidth = 4; for (let k = 0; k < 10; k++) { const a = (k / 10) * Math.PI * 2; g.beginPath(); g.moveTo(64 + Math.cos(a) * 26, 64 + Math.sin(a) * 26); g.lineTo(64 + Math.cos(a) * 60, 64 + Math.sin(a) * 60); g.stroke(); } const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; })();
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.impT, blending: THREE.AdditiveBlending, depthWrite: false, depthTest: false, transparent: true }));
+    sp.position.set(x, y, z); sp.scale.setScalar(0.2); this.group.add(sp);
+    const t0 = performance.now(), size = big ? 1.5 : 0.95;
+    const tick = () => { const p = (performance.now() - t0) / 170; if (p >= 1 || !this.active) { this.group.remove(sp); return; } sp.scale.setScalar(0.2 + size * Math.sqrt(p)); sp.material.opacity = 1 - p; sp.material.rotation = p * 0.6; requestAnimationFrame(tick); };
+    requestAnimationFrame(tick);
+    for (let k = 0; k < (big ? 14 : 8); k++) G.weapons?.sparks?.emit(x, y, z, (Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4, 0.25, 6);
+    // krátký záblesk soupeře
+  }
+  /** Soupeř po zásahu krátce zčervená (vidět, že dostal). */
+  flashBody(o) {
+    if (!o.mats) { o.mats = []; o.m.traverse((q) => { if (q.isMesh && q.material?.emissive) { q.material = q.material.clone(); o.mats.push(q.material); } }); }
+    for (const m of o.mats) { m.emissive.set('#ff2a10'); m.emissiveIntensity = 0.9; }
+    clearTimeout(o.flashTO); o.flashTO = setTimeout(() => { for (const m of o.mats) { m.emissive.set('#000000'); m.emissiveIntensity = 0; } }, 110);
   }
 
   refStep(dt) {
@@ -589,7 +717,8 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       r.m.position.set(r.x, r.y, r.z); r.m.rotation.y = r.h;
       animateHuman(r.m, d > 0.15 ? 1.8 : 0, dt);
       if (d < 0.3) { if (r.bones.uaL) r.bones.uaL.rotation.x -= 2.8; w.act = 'win'; }
-    } else { r.m.position.set(r.x, r.y, r.z); r.m.rotation.y = r.h; animateHuman(r.m, 0, dt); }
+    } else if (this.phase === 'intro') { this.stepTo(r, C.x, C.z, 1.8, dt); }
+    else { r.m.position.set(r.x, r.y, r.z); r.m.rotation.y = r.h; animateHuman(r.m, 0, dt); }
   }
 
   updateFans(dt) {
@@ -634,11 +763,13 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
   /** Kamera: při sledování krouží kolem klece / jde před nastupujícími; při hraní je za hráčem. */
   camera(cam, dt) {
     let tx, ty, tz, px, py, pz;
-    const walking = this.phase === 'walkBlue' || this.phase === 'walkRed';
-    if (walking) {
-      const list = this.phase === 'walkBlue' ? this.blue : this.red, f = list.find((q) => q.m.visible && q.pi < q.path.length) || list[0];
-      tx = f.x; ty = f.y + 1.4; tz = f.z;
-      px = f.x + Math.sin(f.h) * 4.8; pz = f.z + Math.cos(f.h) * 4.8; py = f.y + 2.3;
+    const pre = this.phase === 'show' || this.phase === 'walkAll' || this.phase === 'announce';
+    if (pre) {
+      // úvod: celý oktagon s oběma nástupy, pomalu krouží (při nástupu vidíš obě brány)
+      const ang = this.game.time * 0.08 + (this.camAng0 ??= Math.atan2(this.entries.blue.uz, this.entries.blue.ux) + Math.PI / 2);
+      tx = C.x; tz = C.z; ty = this.deckTop + 0.8;
+      const r0 = this.phase === 'show' ? 13 : 17;
+      px = C.x + Math.cos(ang) * r0; pz = C.z + Math.sin(ang) * r0; py = this.gy + (this.phase === 'show' ? 7 : 9);
     } else if (this.me && this.phase !== 'end' && this.me.act !== 'ko') {
       const me = this.me, op = this.nearestFoe(me) || { x: C.x, z: C.z }, dx = me.x - op.x, dz = me.z - op.z, d = Math.hypot(dx, dz) || 1;
       this.camYawNow = Math.atan2(op.x - me.x, op.z - me.z);
@@ -652,7 +783,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     }
     this.camP ||= new THREE.Vector3(px, py, pz);
     this.camP.lerp(new THREE.Vector3(px, py, pz), Math.min(1, dt * 3));
-    cam.position.copy(this.camP); cam.up.set(0, 1, 0); cam.lookAt(tx, ty, tz);
+    cam.position.copy(this.camP);
+    if (this.shake > 0) { cam.position.x += (Math.random() - 0.5) * this.shake * 0.2; cam.position.y += (Math.random() - 0.5) * this.shake * 0.2; this.shake = Math.max(0, this.shake - dt * 3); }
+    cam.up.set(0, 1, 0); cam.lookAt(tx, ty, tz);
   }
   /** Cíle pro zbraně: diváci a bachaři kolem oktagonu. */
   targets() {
@@ -675,7 +808,8 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     if (!this.active) return;
     this.active = false;
     G.scene.remove(this.group);
-    for (const f of [...(this.all || []), this.ref]) if (f) G.scene.remove(f.m);
+    for (const f of [...(this.all || []), this.ref, this.mc]) if (f) G.scene.remove(f.m);
+    this.music?.pause(); this.music = null;
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }

@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { clamp, pick, wrapAngle } from './util.js?v=20261127192302';
-import { labelTexture } from './textures.js?v=20261127192302';
-import { KIT, kitCar, kitHuman, animateKitHuman } from './models.js?v=20261127192302';
+import { clamp, pick, wrapAngle } from './util.js?v=20261127194543';
+import { labelTexture } from './textures.js?v=20261127194543';
+import { KIT, kitCar, kitHuman, animateKitHuman } from './models.js?v=20261127194543';
 
 /* =========================================================
  *  MATERIÁLY
