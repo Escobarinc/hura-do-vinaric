@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127143103';
-import { Crowd } from './crowd.js?v=20261127143103';
-import { PrisonFX } from './prisonfx.js?v=20261127143103';
+import { makeHuman, animateHuman } from './entities.js?v=20261127143153';
+import { Crowd } from './crowd.js?v=20261127143153';
+import { PrisonFX } from './prisonfx.js?v=20261127143153';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -185,7 +185,7 @@ export class MMA {
 
   /** mode: 'watch' | 'play' (1 na 1, hráč = vězeň) | 'team' (3 na 3) | 'teamPlay' (3 na 3, hráč = vězeň) */
   start(mode = 'watch') {
-    if (this.active) { this.game.toast('Zápas už probíhá'); return; }
+    if (this.active) { if (mode === 'play' || mode === 'teamPlay') this.takeOver(); else this.game.toast('Zápas už probíhá'); return; }
     const G = this.game;
     this.build();
     this.active = true;
@@ -253,7 +253,24 @@ export class MMA {
       c.style.cssText = 'position:fixed;right:16px;bottom:62px;z-index:41;pointer-events:auto;font:800 14px Manrope,sans-serif;color:#fff;background:rgba(14,18,23,.85);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 14px;cursor:pointer';
       c.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCam(); c.blur(); });
       document.body.appendChild(c); this.camBtn = c;
+      const pb = document.createElement('button'); pb.textContent = '🥊 Hraj za vězně';
+      pb.style.cssText = 'position:fixed;right:16px;bottom:108px;z-index:41;pointer-events:auto;font:800 14px Manrope,sans-serif;color:#fff;background:#c8452c;border:0;border-radius:10px;padding:9px 14px;cursor:pointer';
+      pb.addEventListener('click', (e) => { e.stopPropagation(); this.takeOver(); });
+      document.body.appendChild(pb); this.playBtn = pb;
     }
+  }
+  /** Během zápasu se hráč „přesune“ do vězně v kleci a hraje za něj. */
+  takeOver() {
+    if (this.playAs) return;
+    const G = this.game;
+    const f = this.red.find((q) => q.act !== 'ko');
+    if (!f) { G.toast?.('Všichni vězni jsou K.O.'); return; }
+    this.playAs = true; this.me = f; f.name = 'TY (vězeň)';
+    if (G.vehicle) G.exit?.();
+    G.mode = 'mma'; G.player.mesh.visible = false;
+    this.cinematic = true; this.camP = null;
+    this.camBtn?.remove(); this.camBtn = null; this.playBtn?.remove(); this.playBtn = null;
+    G.toast?.('🥊 Hraješ za vězně · WASD · myš / F rána · G / Q kop · Shift kryt · O nůž');
   }
   toggleCam() {
     this.cinematic = !this.cinematic;
@@ -613,7 +630,7 @@ export class MMA {
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }
-    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); document.getElementById('mma-css')?.remove();
+    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); this.playBtn?.remove(); document.getElementById('mma-css')?.remove();
     PrisonFX.voiceEl()?.pause();
     if (G.mode === 'mma') {
       G.mode = 'foot';

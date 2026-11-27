@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127143103';
-import { labelTexture } from './textures.js?v=20261127143103';
-import { Crowd } from './crowd.js?v=20261127143103';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127143153';
+import { labelTexture } from './textures.js?v=20261127143153';
+import { Crowd } from './crowd.js?v=20261127143153';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
