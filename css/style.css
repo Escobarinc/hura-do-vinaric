@@ -297,3 +297,14 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .gate { background:
     repeating-linear-gradient(90deg, transparent 0 62px, #2a3038 62px 64px, #9aa3ac 64px 66px, #3a4149 66px 69px, transparent 69px 96px),
     linear-gradient(transparent 0 8%, #3a4149 8% 9.5%, #9aa3ac 9.5% 10.5%, #2a3038 10.5% 12%, transparent 12% 88%, #3a4149 88% 89.5%, #9aa3ac 89.5% 90.5%, #2a3038 90.5% 92%, transparent 92%) !important; }
+
+/* MMA na telefonu: zbraně odjedou, objeví se Pěst / Kop / Kryt / Nůž */
+.tbtns { transition: transform .35s cubic-bezier(.5,0,.3,1), opacity .35s; }
+.tbtns-mma { position: absolute; right: max(14px, env(safe-area-inset-right)); bottom: calc(max(14px, env(safe-area-inset-bottom)) + 38px); display: grid; grid-template-columns: auto auto; gap: 12px; align-items: end; pointer-events: none; opacity: 0; transform: translateX(140%); transition: transform .35s cubic-bezier(.2,.8,.3,1) .1s, opacity .35s .1s; }
+body.mma-play .tbtns { transform: translateX(160%); opacity: 0; pointer-events: none; }
+body.mma-play .tbtns-mma { transform: none; opacity: 1; pointer-events: auto; }
+.tb-big { width: 88px !important; height: 88px !important; font-size: 30px !important; display: flex; flex-direction: column; align-items: center; justify-content: center; line-height: 1; }
+.tb-big small { font-size: 11px; font-weight: 800; margin-top: 4px; letter-spacing: .08em; }
+.tb-punch { background: rgba(57,255,20,.8) !important; color: #04140b; }
+.tb-kick { background: rgba(255,214,0,.85) !important; color: #1a1400; }
+.tb-mid { width: 60px !important; height: 60px !important; font-size: 24px !important; justify-self: center; }

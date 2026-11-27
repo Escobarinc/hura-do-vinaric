@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127151622';
-import { Crowd } from './crowd.js?v=20261127151622';
-import { PrisonFX } from './prisonfx.js?v=20261127151622';
+import { makeHuman, animateHuman } from './entities.js?v=20261127151756';
+import { Crowd } from './crowd.js?v=20261127151756';
+import { PrisonFX } from './prisonfx.js?v=20261127151756';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -225,6 +225,7 @@ export class MMA {
       this.red.push(this.fighter({ name: conModels[k], uniform: { shirt: '#3f4f63', pants: '#34404f' } }, k === 0 && this.playAs ? 'TY (vězeň)' : conNames[k], 'red'));
     }
     this.me = this.playAs ? this.red[0] : null;
+    document.body.classList.toggle('mma-play', this.playAs);
     this.all = [...this.blue, ...this.red];
     this.ref = this.fighter({ name: 'Suit_Male', uniform: { shirt: '#f4f4f2', pants: '#141414' } }, 'Rozhodčí', null);
     this.place(this.ref, C.x, C.z, Math.PI); this.ref.y = this.deckTop; this.ref.m.position.y = this.ref.y;
@@ -293,6 +294,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     const f = this.red.find((q) => q.act !== 'ko');
     if (!f) { G.toast?.('Všichni vězni jsou K.O.'); return; }
     this.playAs = true; this.me = f; f.name = 'TY (vězeň)';
+    document.body.classList.add('mma-play');
     if (G.vehicle) G.exit?.();
     G.mode = 'mma'; G.player.mesh.visible = false;
     this.cinematic = true; this.camP = null;
@@ -677,7 +679,7 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }
-    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); this.playBtn?.remove(); document.getElementById('mma-css')?.remove(); document.body.classList.remove('mma-on');
+    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); this.playBtn?.remove(); document.getElementById('mma-css')?.remove(); document.body.classList.remove('mma-on', 'mma-play');
     PrisonFX.voiceEl()?.pause();
     if (G.mode === 'mma') {
       G.mode = 'foot';
