@@ -4,8 +4,8 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127214429';
-import { Crowd } from './crowd.js?v=20261127214429';
+import { makeHuman, animateHuman } from './entities.js?v=20261127214508';
+import { Crowd } from './crowd.js?v=20261127214508';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -581,8 +581,9 @@ export class Party {
       const side = spots[k] < 0 ? -1 : 1;
       const [sx, sy, sz] = P(-3.2, side * 7.5, 1.8), [tx, , tz] = P(t.poles ? 2.2 : 2.9, spots[k], 1.8);
       m.position.set(sx, sy, sz); sc.add(m);
-      const mic = new THREE.Mesh(new THREE.CylinderGeometry(0.035, 0.025, 0.2, 8), new THREE.MeshStandardMaterial({ color: '#111', metalness: 0.6, roughness: 0.3 }));
-      const head = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), new THREE.MeshStandardMaterial({ color: '#9aa0a6', metalness: 1, roughness: 0.3 })); head.position.y = 0.12; mic.add(head);
+      const mic = new THREE.Mesh(new THREE.CylinderGeometry(0.055, 0.04, 0.34, 10), new THREE.MeshStandardMaterial({ color: '#141414', metalness: 0.6, roughness: 0.3 }));
+      const head = new THREE.Mesh(new THREE.SphereGeometry(0.085, 14, 10), new THREE.MeshStandardMaterial({ color: '#c8ccd2', metalness: 1, roughness: 0.25, emissive: '#555a60', emissiveIntensity: 0.6 })); head.position.y = 0.2; mic.add(head);
+      const band = new THREE.Mesh(new THREE.CylinderGeometry(0.058, 0.058, 0.04, 10), new THREE.MeshBasicMaterial({ color: r.shirt === '#111111' || r.shirt === '#1d1d22' ? '#39ff14' : r.shirt })); band.position.y = 0.1; mic.add(band);
       this.group.add(mic);
       const spot = new THREE.Mesh(coneGeo, new THREE.MeshBasicMaterial({ color: '#fff6d0', transparent: true, opacity: 0.16, blending: THREE.AdditiveBlending, depthWrite: false }));
       spot.position.set(tx, sy + 9, tz); spot.scale.set(1, 9, 1); spot.visible = false; this.group.add(spot);
@@ -666,7 +667,7 @@ export class Party {
         }
       }
       R.m.updateMatrixWorld(true);
-      if (B.fistR) { B.fistR.getWorldPosition(R.mic.position); R.mic.position.y += 0.1; }
+      if (B.fistR) { B.fistR.getWorldPosition(R.mic.position); R.mic.position.y += 0.12; }
       R.mic.rotation.set(-0.5, face, 0, 'YXZ');
       R.spot.visible = active && R.t >= 3 && (!poleDance || this.stage2); R.spot.position.set(x, R.y + 9, z);
       R.spot.material.opacity = 0.14 + bounce * 0.4;
