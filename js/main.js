@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127234448';
-import { buildWorld } from './world.js?v=20261127234448';
-import { loadModels } from './models.js?v=20261127234448';
-import { Game } from './game.js?v=20261127234448';
-import { Hud } from './hud.js?v=20261127234448';
-import { Input } from './input.js?v=20261127234448';
-import { PrisonFX } from './prisonfx.js?v=20261127234448';
-import { Audio } from './audio.js?v=20261127234448';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127234448';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127235908';
+import { buildWorld } from './world.js?v=20261127235908';
+import { loadModels } from './models.js?v=20261127235908';
+import { Game } from './game.js?v=20261127235908';
+import { Hud } from './hud.js?v=20261127235908';
+import { Input } from './input.js?v=20261127235908';
+import { PrisonFX } from './prisonfx.js?v=20261127235908';
+import { Audio } from './audio.js?v=20261127235908';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127235908';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -331,7 +331,7 @@ async function run(city, progress) {
     su.rayleigh.value = 2 + weather.cloud * 1.5;
     scene.environmentIntensity = 0.12 + 0.45 * day;
     scene.fog.color.copy(tmpB);
-    renderer.toneMappingExposure = 0.55 + 0.45 * day;
+    renderer.toneMappingExposure = (0.55 + 0.45 * day) * (game.darkK ?? 1); // darkK: úplná tma (DOOM)
     scene.fog.near = 200 * weather.fog;
     scene.fog.far = (mobile ? 1000 : 1500) * weather.fog;
     sky.position.copy(camera.position);

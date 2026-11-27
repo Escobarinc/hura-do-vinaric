@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127234448';
+import { makeHuman, animateHuman } from './entities.js?v=20261127235908';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -16,8 +16,8 @@ const HEROES = [
 ];
 const ABIL = {
   iron: [['fly', '🚀 Vzlétni / přistaň'], ['shoot', '💥 Střílej z ruky']],
-  cap: [['hammer', '🔨 Pošli kladivo'], ['pass', '🔨➜ Kladivo Thorovi']],
-  thor: [['axe', '🪓 Hoď sekeru'], ['hammer', '🔨 Hoď kladivo'], ['pass', '🔨➜ Zpět Kapitánovi']],
+  cap: [['hammer', '🔨 Pošli kladivo'], ['axe', '🪓 Hoď sekeru'], ['pass', '🔨➜ Kladivo Thorovi'], ['passAxe', '🪓➜ Sekera Thorovi'], ['callHammer', '🧲 Přivolat kladivo'], ['callAxe', '🧲 Přivolat sekeru']],
+  thor: [['axe', '🪓 Hoď sekeru'], ['hammer', '🔨 Hoď kladivo'], ['pass', '🔨➜ Kladivo Kapitánovi'], ['passAxe', '🪓➜ Sekera Kapitánovi'], ['callHammer', '🧲 Přivolat kladivo'], ['callAxe', '🧲 Přivolat sekeru'], ['bolts', '⚡ Blesky z nebe']],
   spidey: [['swing', '🕸️ Zhoupni se nad lidmi'], ['web', '🕷️ Vystřel síť']],
   hulk: [['smash', '👊 SMASH'], ['leap', '🦘 Skok do davu']],
 };
@@ -84,18 +84,19 @@ export class Avengers {
     const axe = new THREE.Group(); { const hl = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.06, 1.5, 8), wood); hl.position.y = 0.45; axe.add(hl); const bl = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.09, 20, 1, false, 0, Math.PI), metal); bl.rotation.z = Math.PI / 2; bl.rotation.y = Math.PI / 2; bl.position.set(0, 1.05, 0.12); axe.add(bl); const bk = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.3, 0.42), metal); bk.position.set(0, 1.05, -0.2); axe.add(bk); }
     const mk = (obj, holder, hand) => {
       this.p.group.add(obj);
-      const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fxT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); spark.scale.setScalar(2.4); spark.visible = false; this.p.group.add(spark);
-      const bolt = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 7 }, () => new THREE.Vector3())), new THREE.LineBasicMaterial({ color: '#bfe9ff', transparent: true, blending: THREE.AdditiveBlending })); bolt.frustumCulled = false; bolt.visible = false; this.p.group.add(bolt);
+      const spark = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fxT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false })); spark.scale.setScalar(2.4); spark.visible = false; this.p.group.add(spark);
+      const bolt = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 7 }, () => new THREE.Vector3())), new THREE.LineBasicMaterial({ color: '#bfe9ff', transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })); bolt.frustumCulled = false; bolt.visible = false; this.p.group.add(bolt);
       return { obj, holder, hand, fly: null, spark, bolt, spin: 0 };
     };
     this.hammer = mk(ham, 'cap', 'fistR'); this.axe = mk(axe, 'thor', 'fistR');
-    this.G.toast?.('🦸 Avengers přicházejí na pódium! Ovladač je dole.');
+    if (this.p.stage2) this.heroes.forEach((H, i) => { H.home = 'rw'; H.path.push(this.W(this.p.RW.f0 - 0.5, Math.max(-1.5, Math.min(1.5, H.r))), this.W(this.p.RW.f0 + 3.5 + i * 5.6, 0)); });
+    this.G.toast?.(this.p.stage2 ? '🦸 Avengers jdou rovnou na STAGE 2! Ovladač je dole.' : '🦸 Avengers přicházejí na pódium! Ovladač je dole.');
     this.renderPanel();
   }
   hero(id) { return this.heroes.find((h) => h.id === id && !h.gone); }
   /** Směr povelu: u převzatého hrdiny směr kamery, jinak zvolený směr od pódia. */
   dir(H) { const a = this.ctrl === H ? this.G.camYaw : this.p.FACE + this.aim; return { x: Math.sin(a), z: Math.cos(a), a }; }
-  flash(x, y, z, s = 3, col = '#bfe9ff') { this.fxT ||= glow('rgba(255,255,255,1)', 'rgba(120,200,255,.7)'); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fxT, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.position.set(x, y, z); sp.scale.setScalar(s); this.p.group.add(sp); this.flashes.push({ sp, t: 0, s }); }
+  flash(x, y, z, s = 3, col = '#bfe9ff') { this.fxT ||= glow('rgba(255,255,255,1)', 'rgba(120,200,255,.7)'); const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fxT, color: col, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, toneMapped: false })); sp.position.set(x, y, z); sp.scale.setScalar(s); this.p.group.add(sp); this.flashes.push({ sp, t: 0, s }); }
   /** Zabije lidi v okruhu (dav party) a rozhodí je od středu. */
   blast(x, z, rad, power = 7) {
     const C = this.p.crowd; let n = 0;
@@ -108,20 +109,26 @@ export class Avengers {
   }
 
   /* ---------- schopnosti ---------- */
-  act(id, what) {
-    const H = this.hero(id); if (!H) return;
-    const d = this.dir(H), au = this.G.audio;
-    const item = what === 'axe' ? this.axe : this.hammer;
+  act(id, what, tp = null) {
+    const H = this.hero(id); if (!H || H.stun > 0) return;
+    const d = tp ? (() => { const a = Math.atan2(tp.x - H.x, tp.z - H.z); return { x: Math.sin(a), z: Math.cos(a), a }; })() : this.dir(H), au = this.G.audio;
+    const isAxe = what === 'axe' || what === 'passAxe', item = isAxe ? this.axe : this.hammer, nm = isAxe ? 'Sekeru' : 'Kladivo';
     if (what === 'hammer' || what === 'axe') {
-      if (item.fly || item.holder !== id) { this.G.toast?.(what === 'axe' ? 'Sekera je ve vzduchu' : `Kladivo teď má ${this.hero(item.holder)?.name || 'někdo jiný'}`); return; }
+      if (item.fly || item.holder !== id) { if (!tp) this.G.toast?.(item.fly ? `${nm} je ve vzduchu` : `${nm} teď má ${this.hero(item.holder)?.name || 'někdo jiný'}`); return false; }
       H.armT = 0.5; H.faceA = d.a;
-      item.fly = { ph: 'out', d, dist: 0, range: 46, kill: !!this.attack, from: item.obj.position.clone() };
-      au?.noise?.(0.35, 0.3, 400);
-    } else if (what === 'pass') {
+      item.fly = { ph: 'out', d, dist: 0, range: tp ? Math.hypot(tp.x - H.x, tp.z - H.z) + 6 : 46, kill: !!this.attack && !this.doom };
+      au?.noise?.(0.35, 0.3, 400); return true;
+    } else if (what === 'pass' || what === 'passAxe') {
       const to = id === 'cap' ? 'thor' : 'cap', T = this.hero(to);
-      if (!T || this.hammer.fly || this.hammer.holder !== id) { this.G.toast?.('Kladivo teď hodit nejde'); return; }
+      if (!T || item.fly || item.holder !== id) { this.G.toast?.(`${nm} teď hodit nejde – má ho ${this.hero(item.holder)?.name || 'někdo jiný'}`); return; }
       H.armT = 0.5; H.faceA = Math.atan2(T.x - H.x, T.z - H.z);
-      this.hammer.fly = { ph: 'to', to, kill: false }; au?.noise?.(0.3, 0.3, 500);
+      item.fly = { ph: 'to', to, kill: false }; au?.noise?.(0.3, 0.3, 500);
+    } else if (what === 'callHammer' || what === 'callAxe') { // věc přiletí hrdinovi do ruky odkudkoli
+      const it = what === 'callAxe' ? this.axe : this.hammer;
+      if (it.holder === id && !it.fly) { this.G.toast?.(`${H.name} už ${what === 'callAxe' ? 'sekeru' : 'kladivo'} drží`); return; }
+      it.obj.visible = true; it.fly = { ph: 'to', to: id, kill: false }; H.armT = 0.5; H.faceA = H.h; au?.blip?.(500, 0.3, 'triangle', 0.08, 900);
+    } else if (what === 'bolts') {
+      this.storm = { t: 0, T: 5, who: H, tp }; H.armT = 0; au?.noise?.(1.5, 0.6, 150);
     } else if (what === 'smash') {
       H.jump = { t: 0, x0: H.x, z0: H.z, x1: H.x, z1: H.z, h: 2.5, T: 0.55 };
     } else if (what === 'leap') {
@@ -132,9 +139,9 @@ export class Avengers {
       this.G.toast?.(H.flying ? '🚀 Iron Man letí' : 'Iron Man přistává');
     } else if (what === 'shoot') {
       const hand = H.b.fistR ? H.b.fistR.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(H.x, H.y + 1.4, H.z);
-      const tx = H.x + d.x * 20, tz = H.z + d.z * 20, ty = this.G.city.ground(tx, tz) + 0.9;
+      const tx = tp ? tp.x : H.x + d.x * 20, tz = tp ? tp.z : H.z + d.z * 20, ty = tp ? tp.y : this.G.city.ground(tx, tz) + 0.9;
       this.beam(hand, new THREE.Vector3(tx, ty, tz)); H.armT = 0.4; H.faceA = d.a;
-      this.blast(tx, tz, 2.6, 8); au?.blip?.(900, 0.25, 'sawtooth', 0.12, 200);
+      if (!this.doom) this.blast(tx, tz, 2.6, 8); this.hitDoomNear(tx, tz, 4, 9, H); au?.blip?.(900, 0.25, 'sawtooth', 0.12, 200);
     } else if (what === 'web') {
       const from = new THREE.Vector3(H.x, H.y + 1.5, H.z);
       this.webs.push({ p: from, v: new THREE.Vector3(d.x * 30, 3, d.z * 30), t: 0, m: this.webBall(from) }); H.armT = 0.4; H.faceA = d.a;
@@ -148,10 +155,10 @@ export class Avengers {
     }
   }
   webBall(p) { const m = new THREE.Mesh(new THREE.SphereGeometry(0.25, 8, 6), new THREE.MeshBasicMaterial({ color: '#fff', wireframe: true })); m.position.copy(p); this.p.group.add(m); return m; }
-  beam(a, b) {
+  beam(a, b, col = '#8fe9ff') {
     const len = a.distanceTo(b), geo = new THREE.CylinderGeometry(0.14, 0.14, len, 6); geo.translate(0, len / 2, 0); geo.rotateX(Math.PI / 2);
-    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: '#8fe9ff', transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }));
-    m.position.copy(a); m.lookAt(b); this.p.group.add(m); this.beams.push({ m, t: 0 }); this.flash(b.x, b.y, b.z, 5, '#8fe9ff');
+    const m = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color: col, transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false }));
+    m.position.copy(a); m.lookAt(b); this.p.group.add(m); this.beams.push({ m, t: 0 }); this.flash(b.x, b.y, b.z, 5, col);
   }
 
   /* ---------- povely pro všechny ---------- */
@@ -160,10 +167,20 @@ export class Avengers {
     if (c === 'stage2') {
       if (!P.stage2) { P.toggleStage2(); P.syncStage2?.(); }
       this.attack = false;
-      this.heroes.forEach((H, i) => { if (H.gone || this.ctrl === H) return; H.home = 'rw'; H.flying = false; this.route(H, this.W(P.RW.f0 + 3.5 + i * 5.6, 0)); });
+      this.heroes.forEach((H, i) => { if (H.gone || this.ctrl === H) return; H.home = 'rw'; H.flying = false; H.lookA = null; this.route(H, this.W(P.RW.f0 + 3.5 + i * 5.6, 0)); });
+    } else if (c === 'duel') { // jen Kapitán a Thor na molo: Kapitán na začátek, Thor na konec, házejí si
+      if (!P.stage2) { P.toggleStage2(); P.syncStage2?.(); }
+      this.attack = false;
+      for (const H of this.heroes) {
+        if (H.gone || this.ctrl === H) continue; H.flying = false; H.lookA = null;
+        if (H.id === 'cap') { H.home = 'rw'; H.lookA = P.FACE; this.route(H, this.W(P.RW.f0 + 2.5, 0)); }
+        else if (H.id === 'thor') { H.home = 'rw'; H.lookA = P.FACE + Math.PI; this.route(H, this.W(P.RW.f1 - 1.8, 0)); }
+        else { H.home = 'stage'; this.route(H, this.W(3.3, H.r)); }
+      }
+      this.G.toast?.('Kapitán na začátek mola, Thor na konec – házej si mezi nimi kladivo a sekeru');
     } else if (c === 'stage') {
       this.attack = false;
-      for (const H of this.heroes) { if (H.gone || this.ctrl === H) continue; H.home = 'stage'; H.flying = false; this.route(H, this.W(3.3, H.r)); }
+      for (const H of this.heroes) { if (H.gone || this.ctrl === H) continue; H.home = 'stage'; H.flying = false; H.lookA = null; this.route(H, this.W(3.3, H.r)); }
     } else if (c === 'sing') { this.sing = !this.sing; if (!this.sing) P.heroSinger = null; this.G.toast?.(this.sing ? '🎤 Avengers zpívají' : 'Avengers přestali zpívat'); }
     else if (c === 'attack') {
       this.attack = !this.attack; this.sing = false; P.heroSinger = null;
@@ -339,7 +356,7 @@ export class Avengers {
     this.updateGate(dt); this.updateStairs(dt);
     if (this.wantExodus && this.gate?.st === 'open') this.startExodus();
     if (this.exodus && this.pnl && (this._pt = (this._pt || 0) + dt) > 0.5) { this._pt = 0; const el = this.pnl.querySelector('.av-count'); if (el) el.textContent = `Bránou prošlo ${this.goneN} lidí`; }
-    this.updateFx(dt);
+    this.updateFx(dt); this.updateDoom(dt); this.updateStorm(dt);
     if (!this.heroes.length) return;
     // převzatý hrdina: klávesy B / U / L
     if (this.ctrl) {
@@ -352,7 +369,8 @@ export class Avengers {
     if (this.sing) P.heroSinger = singer?.name || null;
     for (const H of this.heroes) {
       if (H.gone) continue;
-      H.t += dt; H.cool -= dt; H.armT = Math.max(0, H.armT - dt);
+      if (this.doom && !H.vs && this.ctrl !== H && !H.jump) continue; // DOOM: nikdo se nehne, dokud nedostane povel k útoku
+      H.t += dt; H.cool -= dt; H.armT = Math.max(0, H.armT - dt); H.stun = Math.max(0, (H.stun || 0) - dt);
       let speed = 0, mode = null;
       if (this.ctrl === H) { // hrdina = hráč
         const pl = G.player; pl.mesh.visible = false; H.walking = false;
@@ -364,7 +382,7 @@ export class Avengers {
         const J = H.jump; J.t += dt; const a = Math.min(1, J.t / J.T);
         H.x = J.x0 + (J.x1 - J.x0) * a; H.z = J.z0 + (J.z1 - J.z0) * a;
         const g0 = this.floorY(J.x0, J.z0), g1 = this.floorY(J.x1, J.z1); H.y = g0 + (g1 - g0) * a + Math.sin(a * Math.PI) * J.h; mode = 'air';
-        if (a >= 1) { H.jump = null; H.y = g1; const n = this.blast(H.x, H.z, 4.6, 9); this.flash(H.x, H.y + 0.6, H.z, 8, '#9cff7a'); G.audio?.noise?.(0.6, 0.6, 90); G.shake = Math.max(G.shake || 0, 0.5); if (n && this.ctrl === H) G.toast?.(`💥 HULK SMASH! ${n} lidí`); }
+        if (a >= 1 && J.quiet) { H.jump = null; H.y = g1; } else if (a >= 1) { H.jump = null; H.y = g1; const n = this.doom ? 0 : this.blast(H.x, H.z, 4.6, 9); this.hitDoomNear(H.x, H.z, 5, 24, H); this.flash(H.x, H.y + 0.6, H.z, 8, '#9cff7a'); G.audio?.noise?.(0.6, 0.6, 90); G.shake = Math.max(G.shake || 0, 0.5); if (n && this.ctrl === H) G.toast?.(`💥 HULK SMASH! ${n} lidí`); }
       }
       // houpání na pavučině (Spider-Man)
       if (H.swing) {
@@ -409,6 +427,7 @@ export class Avengers {
     for (let i = this.webs.length - 1; i >= 0; i--) {
       const w = this.webs[i]; w.t += dt; w.v.y -= 9 * dt; w.p.addScaledVector(w.v, dt); w.m.position.copy(w.p); w.m.rotation.x += dt * 9;
       const gnd = G.city.ground(w.p.x, w.p.z);
+      if (this.doom && this.hitDoomNear(w.p.x, w.p.z, 3, 6, null)) { w.t = 9; }
       if (w.p.y < gnd + 1.2 || w.t > 2) { // dopad: lidé v okruhu zůstanou zamotaní v síti
         const C = P.crowd; for (const q of P.people) { if (q.gone || q.st || C.dead[q.i]) continue; if (Math.hypot(C.x[q.i] - w.p.x, C.z[q.i] - w.p.z) < 3) { q.web = 9; C.setShirt(q.i, '#ffffff'); } }
         const net = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', wireframe: true, transparent: true, opacity: 0.8 })); net.position.set(w.p.x, gnd, w.p.z); net.scale.y = 0.75; P.group.add(net); this.flashes.push({ sp: net, t: 0, s: 0, life: 9 });
@@ -422,6 +441,7 @@ export class Avengers {
   ai(H, dt, t) {
     const G = this.G, P = this.p;
     H.walking = false;
+    if (H.vs && this.doom) { this.vsDoom(H, dt); if (!H.flying) { const fl = this.floorY(H.x, H.z); H.y += (fl - H.y) * Math.min(1, dt * 12); } return; }
     if (this.attack && !H.leave) this.attackAi(H, dt, t);
     if (H.flying) { // Iron Man krouží nad davem
       H.fa = (H.fa || 0) + dt * 0.5; const [cx, cz] = this.W(20, 0), tx = cx + Math.cos(H.fa) * 16, tz = cz + Math.sin(H.fa) * 11, ty = P.gy + 8 + Math.sin(H.fa * 2) * 1.5;
@@ -435,7 +455,7 @@ export class Avengers {
       const dx = w[0] - H.x, dz = w[1] - H.z, d = Math.hypot(dx, dz);
       if (d < 0.2) { H.path.shift(); if (!H.path.length && H.leave) { H.gone = true; G.scene.remove(H.m); H.tag.visible = false; for (const a of H.acc) a.o.visible = false; for (const it of [this.hammer, this.axe]) if (it.holder === H.id && !it.fly) it.obj.visible = false; this.flash(H.x, H.y + 1.5, H.z, 6, '#9fd8ff'); G.audio?.blip?.(500, 0.3, 'sine', 0.08, 1600); if (!this.heroes.some((h) => !h.gone)) { G.toast?.('Avengers zmizeli v hvězdné bráně'); this.clearHeroes(); } } }
       else { const st = Math.min(d, H.speed * dt); H.x += (dx / d) * st; H.z += (dz / d) * st; H.h = Math.atan2(dx, dz); H.walking = true; }
-    } else if (H.home !== 'free' || !this.attack) { if (H.armT <= 0 && !H.leave) H.h += ((this.p.FACE + Math.sin(t * 0.6 + H.k) * 0.3) - H.h) * Math.min(1, dt * 4); }
+    } else if (H.home !== 'free' || !this.attack) { if (H.armT <= 0 && !H.leave) { const ta = H.lookA ?? (this.p.FACE + Math.sin(t * 0.6 + H.k) * 0.3); H.h += Math.atan2(Math.sin(ta - H.h), Math.cos(ta - H.h)) * Math.min(1, dt * 4); } }
   }
   attackAi(H, dt, t) {
     if (H.cool > 0) return;
@@ -455,7 +475,7 @@ export class Avengers {
   /** Kladivo / sekera: v ruce, letí rovně nad hlavami a vrací se, nebo letí k jinému hrdinovi. */
   updateItem(it, dt, t) {
     const o = it.obj, Hh = this.hero(it.holder);
-    const handPos = (H, out) => { const bn = H?.b[it === this.hammer && H.id === 'thor' ? 'fistL' : 'fistR']; if (bn) bn.getWorldPosition(out); else if (H) out.set(H.x, H.y + 1.2, H.z); return out; };
+    const handPos = (H, out) => { const bn = H?.b[(it === this.hammer) === (H?.id === 'thor') ? 'fistL' : 'fistR']; if (bn) bn.getWorldPosition(out); else if (H) out.set(H.x, H.y + 1.2, H.z); return out; };
     if (!it.fly) {
       if (!Hh) { o.visible = false; it.spark.visible = it.bolt.visible = false; return; }
       handPos(Hh, o.position); o.position.y -= 0.25 * Hh.scale; o.rotation.set(0, Hh.h, 0); o.scale.setScalar(Hh.scale * 0.95); it.spark.visible = it.bolt.visible = false; return;
@@ -466,20 +486,145 @@ export class Avengers {
     if (F.ph === 'out') {
       F.dist += sp * dt; o.position.x += F.d.x * sp * dt; o.position.z += F.d.z * sp * dt; o.position.y += (cruise - o.position.y) * Math.min(1, dt * 5);
       if (F.dist >= F.range) F.ph = 'back';
+      if (this.hitDoomNear(o.position.x, o.position.z, 2.6, it === this.axe ? 16 : 14, Hh)) F.ph = 'back';
     } else {
       const T = F.ph === 'to' ? this.hero(F.to) : Hh; if (!T) { it.fly = null; return; }
       handPos(T, V); const dx = V.x - o.position.x, dy = V.y - o.position.y, dz = V.z - o.position.z, d = Math.hypot(dx, dy, dz);
       if (d < sp * dt + 0.3) { // chyceno
-        it.fly = null; if (F.ph === 'to') { it.holder = F.to; this.G.toast?.(`🔨 ${T.name} chytil kladivo`); this.renderPanel(); }
+        it.fly = null; if (F.ph === 'to') { it.holder = F.to; this.G.toast?.(`${it === this.axe ? '🪓' : '🔨'} ${T.name} chytil ${it === this.axe ? 'sekeru' : 'kladivo'}`); this.renderPanel(); }
         T.armT = 0.35; T.faceA = T.h; this.flash(V.x, V.y, V.z, 3); this.G.audio?.blip?.(300, 0.15, 'triangle', 0.1, 120); return;
       }
       o.position.x += (dx / d) * sp * dt; o.position.y += (dy / d) * sp * dt; o.position.z += (dz / d) * sp * dt; F.d = { x: dx / d, z: dz / d, a: Math.atan2(dx, dz) };
     }
     // blesky a zásah lidí (jen při útoku)
     it.spark.visible = true; it.spark.position.copy(o.position); it.spark.material.opacity = 0.6 + Math.random() * 0.4;
-    it.bolt.visible = it === this.hammer && Math.random() < 0.6;
+    it.bolt.visible = it === this.hammer && !this.doom && Math.random() < 0.6;
     if (it.bolt.visible) { const bp = it.bolt.geometry.attributes.position, gnd = this.p.gy + 1.7; for (let k = 0; k < 7; k++) { const a = k / 6; bp.setXYZ(k, o.position.x + (Math.random() - 0.5) * 1.6 * Math.sin(a * Math.PI), o.position.y + (gnd - o.position.y) * a, o.position.z + (Math.random() - 0.5) * 1.6 * Math.sin(a * Math.PI)); } bp.needsUpdate = true; }
     if (F.kill) { const C = this.p.crowd; for (const q of this.p.people) { if (q.gone || C.dead[q.i]) continue; const dx = C.x[q.i] - o.position.x, dz = C.z[q.i] - o.position.z; if (dx * dx + dz * dz < 2.2 && Math.abs(C.y[q.i] + 1.2 - o.position.y) < 2.6) C.kill(q.i, { x: F.d.x, z: F.d.z }, { x: F.d.x * 7 + (Math.random() - 0.5) * 4, y: 5, z: F.d.z * 7 + (Math.random() - 0.5) * 4 }); } }
+  }
+
+
+  /* ---------- Thorovy blesky ---------- */
+  updateStorm(dt) {
+    const S = this.storm, P = this.p; if (!S) return;
+    if (!this.stormLines) { this.stormLines = Array.from({ length: 16 }, () => { const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 12 }, () => new THREE.Vector3())), new THREE.LineBasicMaterial({ color: '#cfeaff', transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })); l.frustumCulled = false; P.group.add(l); return l; }); }
+    S.t += dt; const H = S.who, tx = S.tp ? S.tp.x : H.x, tz = S.tp ? S.tp.z : H.z, ty = S.tp ? S.tp.y : H.y + 2.4 * H.scale * 0.6, done = S.t > S.T || H.gone;
+    if (!S.tp && H.b.uaR && !done) { H.armT = 0; } // Thor drží sekeru nad hlavou
+    for (const l of this.stormLines) {
+      l.visible = !done && Math.random() < 0.7;
+      if (!l.visible || Math.random() > 0.45) continue;
+      const a = l.geometry.attributes.position, sx = tx + (Math.random() - 0.5) * 34, sz = tz + (Math.random() - 0.5) * 34, ex = tx + (Math.random() - 0.5) * (S.tp ? 1.5 : 5), ez = tz + (Math.random() - 0.5) * (S.tp ? 1.5 : 5);
+      for (let k = 0; k < 12; k++) { const u = k / 11, j = Math.sin(u * Math.PI) * 5; a.setXYZ(k, sx + (ex - sx) * u + (Math.random() - 0.5) * j, ty + 75 * (1 - u), sz + (ez - sz) * u + (Math.random() - 0.5) * j); }
+      a.needsUpdate = true;
+    }
+    if (!done) {
+      if (Math.random() < dt * 9) { this.flash(tx + (Math.random() - 0.5) * 4, ty, tz + (Math.random() - 0.5) * 4, 4 + Math.random() * 5, '#cfeaff'); this.G.audio?.noise?.(0.25 + Math.random() * 0.4, 0.5, 120 + Math.random() * 500); }
+      if (P.strobeL && !this.doom) { this._sp ||= P.strobeL.position.clone(); P.strobeL.position.set(tx, ty + 8, tz); P.strobeL.intensity = Math.random() < 0.5 ? 420 : 0; }
+      if (this.attack && !this.doom && Math.random() < dt * 4) this.blast(tx + (Math.random() - 0.5) * 10, tz + (Math.random() - 0.5) * 10, 2.5, 6);
+      if (S.tp && this.doom) this.hitDoom(dt * 7, H, true);
+    } else { if (this._sp) { P.strobeL.position.copy(this._sp); this._sp = null; } this.storm = null; }
+  }
+
+  /* ---------- DOOM ---------- */
+  toggleDoom() { this.openPanel(); if (this.doom) this.endDoom(false); else this.startDoom(); this.renderPanel(); }
+  startDoom() {
+    const P = this.p, G = this.G, RW = P.RW, L = P.rw?.L || 0;
+    const [x, z] = L > 3 ? this.W(RW.f0 + L - 1.6, 0) : this.W(3.2, 0), y = this.floorY(x, z);
+    // vše zhasne a ztichne
+    this._music = P.music && !P.music.paused; P.music?.pause(); this._gain = G.audio?.master?.gain.value; if (G.audio?.master) G.audio.master.gain.value = 0;
+    G.darkK = 0.012; P.doom = true; this.attack = false; this.sing = false; this.storm = null;
+    const col = '#1f7a2e', m = makeHuman({ name: 'Suit_Male', uniform: { shirt: col, pants: '#14501e', hat: '#14501e' }, skin: '#b9c0c6', scale: 1.7, tint: false });
+    m.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.toneMapped = false; const c = o.material.color.clone(); o.material.emissive = c.clone().multiplyScalar(0.55); o.material.color.multiplyScalar(0.002); } });
+    G.scene.add(m);
+    const b = {}; m.traverse((o) => { if (/^UpperArm\.?L$/.test(o.name)) b.uaL = o; if (/^UpperArm\.?R$/.test(o.name)) b.uaR = o; if (/^Torso$/.test(o.name)) b.torso = o; if (/^Head$/.test(o.name)) b.head = o; if (/^Fist\.?R$/.test(o.name)) b.fistR = o; });
+    const g = new THREE.Group(); P.group.add(g);
+    const gm = (c, o) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false, toneMapped: false, side: THREE.DoubleSide });
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.4, 2.4, 160, 24, 1, true), gm('#39ff14', 0.22)); beam.position.set(x, y + 80, z); g.add(beam);
+    const core = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 160, 12, 1, true), gm('#b6ffa6', 0.35)); core.position.set(x, y + 80, z); g.add(core);
+    const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.9, 40), gm('#39ff14', 0.9)); ring.rotation.x = -Math.PI / 2; ring.position.set(x, y + 0.06, z); g.add(ring);
+    const cloak = new THREE.MeshBasicMaterial({ color: '#17a33a', side: THREE.DoubleSide, toneMapped: false });
+    const cape = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.1, 1, 4), cloak); cape.geometry.translate(0, -0.9, 0); g.add(cape);
+    const hood = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), cloak); g.add(hood);
+    const eyes = [-0.11, 0.11].map((ex) => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: '#d8ffd0', toneMapped: false })); g.add(e); return [e, ex]; });
+    const light = new THREE.PointLight('#39ff14', 5200, 46, 1.25); light.position.set(x, y + 4, z); g.add(light);
+    const tag = label('DOOM', '#39ff14'); tag.material.toneMapped = false; tag.material.color.set('#7dff5c'); g.add(tag);
+    this.doom = { st: 'fall', t: 0, hp: 300, x, z, y, m, b, g, beam, core, ring, cape, hood, eyes, light, tag, cy: y + 95, scale: 1.7, hitT: 0, cool: 0 };
+    m.position.set(x, y + 95, z); m.rotation.y = P.FACE;
+  }
+  doomPos() { const D = this.doom; return D ? { x: D.x, y: D.cy + 1.6, z: D.z } : null; }
+  hitDoomNear(x, z, rad, dmg, from) { const D = this.doom; if (!D || D.st !== 'stand' || Math.hypot(D.x - x, D.z - z) > rad) return false; this.hitDoom(dmg, from); return true; }
+  hitDoom(dmg, from, quiet = false) {
+    const D = this.doom; if (!D || D.st !== 'stand') return;
+    D.hp -= dmg; D.hitT = 0.25;
+    if (!quiet) { this.flash(D.x, D.cy + 1.6, D.z, 6, '#39ff14'); this.G.audio?.blip?.(140, 0.3, 'square', 0.14, 60); }
+    if ((this._ht = (this._ht || 0) + (quiet ? 0.02 : 1)) >= 1) { this._ht = 0; const el = this.pnl?.querySelector('.av-doom'); if (el) el.textContent = `DOOM ❤ ${Math.max(0, Math.ceil(D.hp))}`; }
+    if (D.hp <= 0) { this.endDoom(true); return; }
+    // odveta: zelený výboj hrdinu odhodí zpět
+    if (from && !quiet && D.cool <= 0 && from.vs && !from.jump) {
+      D.cool = 1.4; const a = Math.atan2(from.x - D.x, from.z - D.z), d = Math.hypot(from.x - D.x, from.z - D.z);
+      this.beam(new THREE.Vector3(D.x, D.cy + 2.2, D.z), new THREE.Vector3(from.x, from.y + 1.2, from.z), '#39ff14');
+      from.flying = false; from.jump = { t: 0, x0: from.x, z0: from.z, x1: from.x + Math.sin(a) * Math.max(4, 11 - d * 0.3), z1: from.z + Math.cos(a) * Math.max(4, 11 - d * 0.3), h: 3.5, T: 0.8, quiet: true }; from.stun = 2.2; from.cool = 2.6;
+      this.G.audio?.blip?.(220, 0.35, 'sawtooth', 0.12, 70);
+    }
+  }
+  attackDoom(id) {
+    const D = this.doom; if (!D || D.st !== 'stand') { this.G.toast?.('Doom ještě nepřistál'); return; }
+    const list = id === 'all' ? this.heroes.filter((h) => !h.gone) : [this.hero(id)].filter(Boolean);
+    for (const H of list) { if (this.ctrl === H) continue; H.vs = H.vs && id !== 'all' ? null : { t: 0 }; H.path = []; H.home = 'free'; H.lookA = null; H.cool = Math.random() * 0.8; if (!H.vs) H.flying = false; }
+    this.G.toast?.(id === 'all' ? '⚔️ Všichni Avengers útočí na Dooma!' : `⚔️ ${list[0]?.name}: ${list[0]?.vs ? 'útok na Dooma' : 'stahuje se'}`);
+    this.renderPanel();
+  }
+  /** Hrdina útočí na Dooma: dostane se na dostřel a používá svoji schopnost. */
+  vsDoom(H, dt) {
+    const D = this.doom, tp = this.doomPos(), dx = D.x - H.x, dz = D.z - H.z, d = Math.hypot(dx, dz) || 1;
+    const want = { hulk: 9, cap: 11, thor: 13, spidey: 10, iron: 12 }[H.id];
+    if (H.stun > 0) return;
+    H.h = Math.atan2(dx, dz);
+    if (H.id === 'iron') { H.flying = true; H.y += (D.cy + 7 - H.y) * Math.min(1, dt * 1.5); H.fa = (H.fa || 0) + dt * 0.7; const ox = D.x + Math.cos(H.fa) * want, oz = D.z + Math.sin(H.fa) * want, ex = ox - H.x, ez = oz - H.z, ed = Math.hypot(ex, ez) || 1, sp = Math.min(ed * 2, 13); H.x += (ex / ed) * sp * dt; H.z += (ez / ed) * sp * dt; H.fspeed = sp * 0.4; }
+    else if (d > want + 1.5) { const st = H.speed * 1.5 * dt; H.x += (dx / d) * st; H.z += (dz / d) * st; H.walking = true; }
+    if (H.cool > 0 || d > want + 6) return;
+    if (H.id === 'hulk') { H.jump = { t: 0, x0: H.x, z0: H.z, x1: D.x - (dx / d) * 1.6, z1: D.z - (dz / d) * 1.6, h: 5, T: 0.8 }; H.cool = 2.4; }
+    else if (H.id === 'cap') { if (!this.act('cap', 'hammer', tp)) this.act('cap', 'axe', tp); H.cool = 2.6; }
+    else if (H.id === 'thor') { if (!this.storm && Math.random() < 0.5) this.act('thor', 'bolts', tp); else if (!this.act('thor', 'axe', tp)) this.act('thor', 'hammer', tp); H.cool = 2.8; }
+    else if (H.id === 'iron') { this.act('iron', 'shoot', tp); H.cool = 1.1; }
+    else if (H.id === 'spidey') { const from = new THREE.Vector3(H.x, H.y + 1.5, H.z); this.beam(from, new THREE.Vector3(tp.x, tp.y, tp.z), '#ffffff'); this.hitDoom(6, H); H.armT = 0.4; H.faceA = H.h; H.cool = 1.6; }
+  }
+  updateDoom(dt) {
+    const G = this.G;
+    if (this.leaving) { const Q = this.leaving; Q.t += dt; Q.cy += dt * (8 + Q.t * 30); Q.m.position.y = Q.cy; Q.g.visible = Q.t < 0.1 || Math.random() < 0.7; if (Q.cy > Q.y + 150) { G.scene.remove(Q.m); this.p.group.remove(Q.g); this.leaving = null; } }
+    const D = this.doom; if (!D) { if (G.darkK != null && G.darkK < 1) G.darkK = Math.min(1, G.darkK + dt * 0.5); return; }
+    D.t += dt; D.cool -= dt; D.hitT = Math.max(0, D.hitT - dt);
+    const fl = D.y;
+    if (D.st === 'fall') { // snáší se v zeleném světle z nebe
+      const a = Math.min(1, D.t / 7), e = 1 - Math.pow(1 - a, 2.2); D.cy = fl + 95 * (1 - e);
+      if (a >= 1) { D.st = 'stand'; D.cy = fl; if (G.audio?.master) G.audio.master.gain.value = this._gain ?? 0.5; G.audio?.noise?.(1.4, 0.8, 70); this.flash(D.x, fl + 0.5, D.z, 14, '#39ff14'); G.toast?.('☠ DOOM přistál. Vyber, kdo na něj zaútočí.'); this.renderPanel(); }
+    } else if (D.st === 'leave') { D.cy += dt * (8 + D.t * 30); if (D.cy > fl + 140) { G.scene.remove(D.m); this.p.group.remove(D.g); this.doom = null; return; } }
+    D.m.position.set(D.x, D.cy + (D.st === 'stand' ? Math.sin(D.t * 1.2) * 0.08 + 0.12 : 0), D.z);
+    animateHuman(D.m, 0, dt, D.st === 'stand' ? null : 'air');
+    if (D.b.uaL) D.b.uaL.rotation.z -= 0.5; if (D.b.uaR) D.b.uaR.rotation.z += 0.5;
+    if (D.hitT > 0 && D.b.uaR) D.b.uaR.rotation.x -= 2.2;
+    D.m.updateMatrixWorld(true);
+    const h = D.m.rotation.y, sy = Math.sin(h), cy = Math.cos(h), s = D.scale, py = D.m.position.y;
+    const at = (o, bone, ox, oy, oz, fy) => { if (D.b[bone]) D.b[bone].getWorldPosition(V); else V.set(D.x, py + fy * s, D.z); o.position.set(V.x + (cy * ox + sy * oz) * s, V.y + oy * s, V.z + (-sy * ox + cy * oz) * s); o.rotation.y = h; };
+    at(D.cape, 'torso', 0, 0.55, -0.26, 0.9); D.cape.rotation.x = D.st === 'stand' ? 0.12 + Math.sin(D.t * 2) * 0.05 : -0.7;
+    at(D.hood, 'head', 0, 0.2, -0.03, 1.35); for (const [e, ex] of D.eyes) at(e, 'head', ex, 0.2, 0.3, 1.35);
+    D.tag.position.set(D.x, py + 1.76 * s + 0.7, D.z);
+    D.light.position.set(D.x, py + 3, D.z); D.light.intensity = 5200 * (0.85 + Math.sin(D.t * 5) * 0.15) * (D.hitT > 0 ? 1.8 : 1);
+    D.beam.material.opacity = 0.2 + Math.sin(D.t * 3) * 0.05; D.core.material.opacity = D.st === 'stand' ? 0.12 : 0.4; D.beam.rotation.y += dt * 0.4;
+    D.ring.scale.setScalar(1 + Math.sin(D.t * 2.5) * 0.08);
+  }
+  /** Konec Dooma: poražen (výbuch) nebo odlétá; světla a hudba se vrátí. */
+  endDoom(beaten, hard = false) {
+    const D = this.doom, G = this.G, P = this.p; if (!D) return;
+    P.doom = false; if (G.audio?.master) G.audio.master.gain.value = this._gain ?? 0.5;
+    D.light.intensity = 0;
+    if (this._music && P.music && !hard) P.music.play().catch(() => {});
+    for (const H of this.heroes) { if (H.vs) { H.vs = null; H.flying = false; if (!H.gone && this.ctrl !== H) { H.home = 'stage'; this.route(H, this.W(3.3, H.r)); } } }
+    if (beaten) { for (let k = 0; k < 9; k++) this.flash(D.x + (Math.random() - 0.5) * 5, D.cy + 1 + Math.random() * 3, D.z + (Math.random() - 0.5) * 5, 8 + Math.random() * 10, k % 2 ? '#39ff14' : '#ffffff'); G.audio?.noise?.(1.6, 0.9, 110); G.toast?.('💥 DOOM je poražen! Světla a hudba se vracejí.'); }
+    else if (!hard) G.toast?.('Doom odlétá – světla a hudba se vracejí');
+    if (hard) { G.scene.remove(D.m); P.group.remove(D.g); this.doom = null; G.darkK = 1; }
+    else { D.st = 'leave'; D.t = 0; this.doom = null; this._gone = D; G.darkK = Math.max(G.darkK, 0.05); this.leaving = D; }
+    this.renderPanel();
   }
 
   /* ---------- ovladač ---------- */
@@ -513,6 +658,8 @@ export class Avengers {
       if (D.gate) this.toggleGate();
       if (D.stairs) this.toggleStairs();
       if (D.exo) this.startExodus();
+      if (D.doom) this.toggleDoom();
+      if (D.vs) this.attackDoom(D.vs);
     });
     this.renderPanel();
   }
@@ -528,9 +675,12 @@ export class Avengers {
       h += `<div class="r"><span>Hrdina</span>${live.map((x) => `<button data-sel="${x.id}"${on(x.id === this.sel)}>${x.name}${this.ctrl === x ? ' 🎮' : ''}</button>`).join('')}</div>`;
       h += `<div class="r"><span>${H.name}</span>${ABIL[H.id].map(([a, l]) => `<button data-act="${a}">${l}</button>`).join('')}<button data-pos="1"${on(this.ctrl === H)}>${this.ctrl === H ? '🎮 Pustit (L)' : '🎮 Ovládat sám'}</button></div>`;
       h += `<div class="r"><span>Směr hodu</span>${[[1.0, '⬅'], [0.5, '↖'], [0, '⬆ rovně'], [-0.5, '↗'], [-1.0, '➡']].map(([a, l]) => `<button data-aim="${a}"${on(Math.abs(this.aim - a) < 0.01)}>${l}</button>`).join('')}<span style="min-width:0">🔨 má: ${holder}</span></div>`;
+      h += `<div class="r"><span>Duel</span><button data-cmd="duel">🔨🪓 Jen Kapitán + Thor na molo</button><span style="min-width:0">🪓 má: ${this.hero(this.axe.holder)?.name || '—'}</span></div>`;
       h += `<div class="r"><span>Všichni</span><button data-cmd="stage2">Na STAGE 2</button><button data-cmd="stage">Zpět na pódium</button><button data-cmd="sing"${on(this.sing)}>🎤 Zpívat</button><button data-cmd="attack" class="${this.attack ? 'on' : 'red'}">${this.attack ? '⏹ Zastavit útok' : '⚔️ ÚTOK NA LIDI'}</button></div>`;
     }
     h += `<div class="r"><span>Brána</span><button data-gate="1"${on(gUp)}>${gUp ? '🌀 Zavřít bránu' : '🌀 STARGATE'}</button>${live.length ? `<button data-cmd="leave">Avengers bránou pryč</button>` : ''}<button data-cmd="rapLeave">Rappeři bránou pryč</button></div>`;
+    const dm = this.doom;
+    h += `<div class="r"><span>DOOM</span><button data-doom="1" class="${dm ? 'on' : 'red'}">${dm ? '☠ Doom odletí' : '☠ DOOM'}</button>${dm && dm.st === 'stand' && live.length ? `<span style="min-width:0">Útok na Dooma:</span>${live.map((x) => `<button data-vs="${x.id}"${on(!!x.vs)}>${x.name}</button>`).join('')}<button data-vs="all" class="go">Všichni</button>` : ''}${dm ? `<span class="av-doom" style="min-width:0;color:#39ff14">DOOM ❤ ${Math.max(0, Math.ceil(dm.hp))}</span>` : ''}</div>`;
     h += `<div class="r"><span>Lidé</span><button data-stairs="1"${on(this.stairs?.on)}>🪜 Schody ze STAGE 2</button><button data-exo="1"${on(this.exodus)}>🌀 Všichni bránou</button><span class="av-count" style="min-width:0">${this.exodus ? `Bránou prošlo ${this.goneN} lidí` : gOpen ? 'brána otevřená' : ''}</span></div></div>`;
     d.innerHTML = h;
   }
@@ -538,10 +688,12 @@ export class Avengers {
     const sc = this.G.scene, g = this.p.group;
     for (const H of this.heroes) { sc.remove(H.m); g.remove(H.tag); for (const a of H.acc) g.remove(a.o); if (H.swing?.line) g.remove(H.swing.line); }
     for (const it of [this.hammer, this.axe]) if (it) { g.remove(it.obj); g.remove(it.spark); g.remove(it.bolt); }
+    if (this.stormLines) { for (const l of this.stormLines) g.remove(l); this.stormLines = null; } this.storm = null;
     this.heroes = []; this.hammer = this.axe = null; this.sing = false; this.attack = false; this.p.heroSinger = null; this.renderPanel();
   }
   /** Konec party: vše pryč. */
   stop() {
+    if (this.doom) this.endDoom(false, true);
     this.release(); if (this.heroes.length) this.clearHeroes();
     this.gate = null; this.stairs = null; this.exodus = false; this.wantExodus = false;
     this.webs = []; this.beams = []; this.flashes = [];

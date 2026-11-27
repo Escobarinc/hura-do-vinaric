@@ -4,9 +4,9 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127234448';
-import { Avengers } from './avengers.js?v=20261127234448';
-import { Crowd } from './crowd.js?v=20261127234448';
+import { makeHuman, animateHuman } from './entities.js?v=20261127235908';
+import { Avengers } from './avengers.js?v=20261127235908';
+import { Crowd } from './crowd.js?v=20261127235908';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -373,6 +373,7 @@ export class Party {
   /* ---------------- průběh ---------------- */
   update(dt) {
     if (!this.active) return;
+    if (this.doom) { this.av.update(dt, 0); return; } // DOOM: vše zhasne, ztichne a nikdo se nehne
     this.t += dt;
     const G = this.game, F = this.fx, gy = this.gy;
     const mt = this.music && !this.music.paused ? this.music.currentTime : this.t;
