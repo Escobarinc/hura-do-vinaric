@@ -185,3 +185,23 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .choices button i{font-style:normal;font-size:34px}
 .choices button b{position:absolute;top:8px;left:10px;font-size:11px;color:#e0a94a}
 @media (max-width:560px){.choices{grid-template-columns:repeat(2,minmax(120px,1fr))}}
+
+/* ---------- panely s akcemi věznice na úvodní obrazovce ---------- */
+#menu { overflow-y: auto; align-items: start; }
+#menu .menu-card { max-width: 1040px; padding: 28px 0 40px; }
+.feat { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; margin: 26px 0 18px; text-align: left; }
+.fc { margin: 0; position: relative; border-radius: 14px; overflow: hidden; background: #161c24; border: 1px solid var(--line); aspect-ratio: 16 / 10; }
+.fc img { width: 100%; height: 100%; object-fit: cover; display: block; transition: transform .4s; }
+.fc:hover img { transform: scale(1.05); }
+.fc figcaption { position: absolute; inset: auto 0 0 0; padding: 26px 12px 10px; background: linear-gradient(transparent, rgba(8,11,14,.92)); }
+.fc b { display: block; font-size: 15px; font-weight: 800; color: #fff; }
+.fc span { display: block; font-size: 12px; color: #c3ccd5; line-height: 1.35; margin-top: 2px; }
+.fc-top { grid-column: span 2; grid-row: span 2; border: 2px solid var(--brick); aspect-ratio: auto; }
+.fc-top b { font-family: "Unbounded", var(--font); font-size: 22px; }
+.fc-top span { font-size: 14px; }
+.fc em { display: inline-block; font-style: normal; font-weight: 800; font-size: 11px; letter-spacing: .1em; color: #fff; background: var(--brick); padding: 3px 8px; border-radius: 6px; margin-bottom: 6px; }
+@media (max-width: 760px) {
+  .feat { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  .fc-top { grid-column: span 2; grid-row: auto; aspect-ratio: 16 / 10; }
+  .fc b { font-size: 13px; } .fc span { font-size: 11px; }
+}
