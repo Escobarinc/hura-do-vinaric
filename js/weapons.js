@@ -666,7 +666,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     G.audio?.noise?.(0.09, 0.7, 320); G.audio?.blip?.(90, 0.08, 'square', 0.12, -40);
     this.shake = Math.max(this.shake, 0.06);
     if (hp <= 0) { best.kill(D, { vel: D.clone().multiplyScalar(3).add(new THREE.Vector3(0, 2.5, 0)) }); this.punchHp.delete(key); this.fighters = (this.fighters || []).filter((f) => f.key !== key); }
-    else if (!(this.fighters ||= []).some((f) => f.key === key)) this.fighters.push({ key, t: best, next: G.time + 0.7 + Math.random() * 0.4 }); // brání se
+    else if (!(this.fighters ||= []).some((f) => f.key === key) && this.fighters.length < 3) this.fighters.push({ key, t: best, next: G.time + 0.7 + Math.random() * 0.4 }); // brání se
     else if (best.mesh.isObject3D) { best.mesh.position.x += fx * 0.35; best.mesh.position.z += fz * 0.35; } // zavrávorá
     for (const p of G.peds) if (p.mesh === best.mesh) { p.state = 'flee'; p.timer = 8; p.x += fx * 0.35; p.z += fz * 0.35; }
     if (hp === 2 && G.police.some((c) => Math.hypot(c.veh.x - P.x, c.veh.z - P.z) < 90)) G.addWanted(1);
@@ -691,10 +691,10 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
         const ped = G.peds.find((p) => p.mesh === t.mesh); if (ped) { ped.x = t.mesh.position.x; ped.z = t.mesh.position.z; ped.state = 'fight'; ped.timer = 3; }
       }
       if (d < 1.8 && G.time >= f.next) {
-        f.next = G.time + 1.1 + Math.random() * 0.5;
+        f.next = G.time + 1.4 + Math.random() * 0.7;
         if (!t.crowd) { t.mesh.userData.punchNew = true; t.mesh.userData.punchT = 0.45; }
-        if (Math.random() < 0.75) { // zásah
-          G.hurt(5 + Math.round(Math.random() * 4), 'rvačka');
+        if (Math.random() < 0.6) { // zásah
+          G.hurt(3 + Math.round(Math.random() * 3), 'rvačka');
           this.bleed(new THREE.Vector3(P.x, P.y + 1.55, P.z), new THREE.Vector3(-dx / (d || 1), 0, -dz / (d || 1)), 3);
           G.audio?.noise?.(0.08, 0.6, 360);
           this.shake = Math.max(this.shake, 0.12);
