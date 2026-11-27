@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127200331';
-import { Crowd } from './crowd.js?v=20261127200331';
-import { PrisonFX } from './prisonfx.js?v=20261127200331';
+import { makeHuman, animateHuman } from './entities.js?v=20261127200547';
+import { Crowd } from './crowd.js?v=20261127200547';
+import { PrisonFX } from './prisonfx.js?v=20261127200547';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -23,15 +23,11 @@ const VOICE = { // hlášky hlasatelky (nahrané, hrají i na telefonu)
 
 /** Znak OKTAGON (podle dodaného loga) do plátna: střed cx, cy, velikost size (šířka znaku). */
 function oktagonMark(g, cx, cy, size) {
-  const k = size / 800, P = (pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo : g.moveTo).call(g, cx + (x - 400) * k, cy + (y - 400) * k)); g.closePath(); };
-  g.save(); g.lineJoin = 'round';
-  P([[245, 40], [555, 40], [760, 245], [760, 555], [555, 760], [245, 760], [40, 555], [40, 245]]); g.fillStyle = '#f2b400'; g.fill(); g.lineWidth = 14 * k; g.strokeStyle = '#111'; g.stroke();
-  P([[295, 145], [505, 145], [655, 295], [655, 505], [505, 655], [295, 655], [145, 505], [145, 295]]); g.fillStyle = '#ffffff'; g.fill();
-  P([[308, 180], [492, 180], [620, 308], [620, 492], [492, 620], [308, 620], [180, 492], [180, 308]]); g.fillStyle = '#202020'; g.fill();
-  g.fillStyle = '#ffffff';
-  P([[548, 238], [362, 345], [360, 300], [352, 300], [208, 432], [208, 438], [618, 307]]); g.fill();
-  P([[180, 445], [208, 438], [618, 307], [620, 345], [590, 362], [182, 492]]); g.fill();
-  P([[182, 492], [590, 362], [438, 455], [440, 500], [250, 560]]); g.fill();
+  // žlutý osmiúhelníkový rám (podle dodaného loga) na černém podkladu
+  const k = size / 1300, P = (pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo : g.moveTo).call(g, cx + (x - 650) * k, cy + (y - 650) * k)); g.closePath(); };
+  g.save();
+  P([[298, 13], [997, 13], [1287, 303], [1287, 997], [997, 1287], [298, 1287], [13, 997], [13, 303]]); g.fillStyle = '#ffd700'; g.fill();
+  P([[318, 125], [977, 125], [1175, 321], [1175, 977], [977, 1175], [318, 1175], [125, 977], [125, 321]]); g.fillStyle = '#0b0b0b'; g.fill();
   g.restore();
 }
 /** Logo OKTAGON MMA: žluté OKTAGON se znakem místo posledního O a pod ním MMA. */
@@ -65,10 +61,9 @@ export class MMA {
     const oct = (r) => { cg.beginPath(); for (let k = 0; k <= 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; cg.lineTo(512 + Math.cos(a) * r, 512 + Math.sin(a) * r); } };
     cg.strokeStyle = '#b11d1d'; cg.lineWidth = 12; oct(480); cg.stroke();
     // logo OKTAGON MMA uprostřed plachty
-    cg.save(); cg.shadowColor = 'rgba(0,0,0,.55)'; cg.shadowBlur = 0; cg.shadowOffsetX = 6; cg.shadowOffsetY = 6;
-    oktagonMark(cg, 512, 400, 340);
-    oktagonLogo(cg, 512, 690, 660, '#111111');
-    cg.restore();
+    // logo uprostřed: žlutý osmiúhelník na černém podkladu, uvnitř OKTAGON MMA
+    oktagonMark(cg, 512, 512, 560);
+    cg.save(); cg.fillStyle = '#ffd700'; cg.font = '900 92px "Russo One", "Arial Black", sans-serif'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.fillText('OKTAGON', 512, 490); cg.fillStyle = '#ffffff'; cg.font = '900 58px "Russo One", "Arial Black", sans-serif'; cg.fillText('MMA', 512, 575); cg.restore();
     const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
     // osmiboká plošina (CylinderGeometry s 8 stranami = oktagon)
     const deck = new THREE.Mesh(new THREE.CylinderGeometry(R, R, DECK, 8, 1), [mat('#1a1a1a'), new THREE.MeshStandardMaterial({ map: ft, roughness: 0.9 }), mat('#1a1a1a')]);
