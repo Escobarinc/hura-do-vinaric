@@ -250,3 +250,27 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .logo { font-family: "Russo One", var(--font) !important; animation: none !important; letter-spacing: .01em; }
 .logo span { color: #f2f6f0 !important; text-shadow: 0 0 6px rgba(57,255,20,.35) !important; }
 .logo b { color: #5dff3a !important; animation: none !important; text-shadow: 0 0 5px rgba(57,255,20,.55), 0 0 14px rgba(57,255,20,.25) !important; }
+/* ---------- úvodní efekt: mříž se zvedne, nápis vyjede zezadu, mříž za ním zaklapne ---------- */
+.logo-stage { position: relative; display: inline-block; padding: 18px 34px 22px; perspective: 900px; }
+.logo-stage .logo { position: relative; z-index: 1; animation: logo-out 2.4s cubic-bezier(.2,.8,.2,1) both !important; }
+.gate { position: absolute; inset: 0; z-index: 2; border-radius: 6px; overflow: hidden; transform-origin: top center;
+  background:
+    repeating-linear-gradient(90deg, transparent 0 34px, #2a3038 34px 38px, #8d969f 38px 41px, #3a4149 41px 46px, transparent 46px 80px),
+    linear-gradient(transparent 0 18%, #3a4149 18% 20%, #8d969f 20% 21.5%, #2a3038 21.5% 23.5%, transparent 23.5% 76%, #3a4149 76% 78%, #8d969f 78% 79.5%, #2a3038 79.5% 81.5%, transparent 81.5%);
+  box-shadow: inset 0 0 0 3px #2a3038, 0 10px 24px rgba(0,0,0,.55);
+  animation: gate-cycle 2.4s cubic-bezier(.6,0,.3,1) both; }
+.gate i { position: absolute; left: 0; right: 0; bottom: 0; height: 10px; background: linear-gradient(#8d969f, #2a3038); }
+@keyframes gate-cycle {
+  0% { transform: translateY(0); z-index: 2; }
+  30% { transform: translateY(-112%); z-index: 2; }   /* mříž vyjede nahoru */
+  58% { transform: translateY(-112%); z-index: 0; }   /* nápis už je vepředu */
+  74% { transform: translateY(2%); z-index: 0; }      /* zaklapne */
+  80% { transform: translateY(-4%); }
+  86%, 100% { transform: translateY(0); z-index: 0; }
+}
+@keyframes logo-out {
+  0%, 18% { transform: translateZ(-420px) scale(.55); opacity: .25; filter: blur(4px) brightness(.6); z-index: 1; }
+  50% { transform: translateZ(60px) scale(1.06); opacity: 1; filter: blur(0) brightness(1.15); z-index: 3; }
+  62%, 100% { transform: none; opacity: 1; filter: none; z-index: 3; }
+}
+@media (prefers-reduced-motion: reduce) { .gate, .logo-stage .logo { animation: none !important; } .gate { z-index: 0; } }
