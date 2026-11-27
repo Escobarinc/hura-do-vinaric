@@ -217,3 +217,7 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .btn-primary:hover { filter: brightness(1.08); box-shadow: 0 5px 0 #0b6b35, 0 0 22px rgba(43,255,136,.45); }
 .logo { letter-spacing: 0; }
 .logo, #menu .claim, .fc-top b, .controls-panel h3 { font-weight: 400 !important; } /* Bungee má jen jeden řez */
+/* větší tlačítka na úvodu */
+#menu .btn { font-size: 22px; padding: 18px 46px; border-radius: 14px; min-width: 190px; }
+#menu .menu-actions { gap: 16px; }
+@media (max-width: 760px) { #menu .btn { font-size: 19px; padding: 15px 30px; min-width: 150px; } }
