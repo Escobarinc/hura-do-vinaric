@@ -10,11 +10,11 @@
  * Souřadnice světa: x = východ, z = jih.
  */
 import * as THREE from 'three';
-import { Crowd } from './crowd.js?v=20261127155453';
-import { makeHuman, animateHuman } from './entities.js?v=20261127155453';
-import { labelTexture } from './textures.js?v=20261127155453';
-import { BACKYARD } from './world.js?v=20261127155453';
-import { pointInPoly } from './util.js?v=20261127155453';
+import { Crowd } from './crowd.js?v=20261127152720';
+import { makeHuman, animateHuman } from './entities.js?v=20261127152720';
+import { labelTexture } from './textures.js?v=20261127152720';
+import { BACKYARD } from './world.js?v=20261127152720';
+import { pointInPoly } from './util.js?v=20261127152720';
 
 const AREA = { x0: -462, x1: -42, z0: 988, z1: 1236 }; // obdélník kolem areálu
 const DOORS = [ // vchody, odkud vychází oddíly (plechové dveře se stříškou)
