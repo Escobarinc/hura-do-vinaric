@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127200058';
-import { Crowd } from './crowd.js?v=20261127200058';
-import { PrisonFX } from './prisonfx.js?v=20261127200058';
+import { makeHuman, animateHuman } from './entities.js?v=20261127200331';
+import { Crowd } from './crowd.js?v=20261127200331';
+import { PrisonFX } from './prisonfx.js?v=20261127200331';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -25,7 +25,7 @@ const VOICE = { // hlášky hlasatelky (nahrané, hrají i na telefonu)
 function oktagonMark(g, cx, cy, size) {
   const k = size / 800, P = (pts) => { g.beginPath(); pts.forEach(([x, y], i) => (i ? g.lineTo : g.moveTo).call(g, cx + (x - 400) * k, cy + (y - 400) * k)); g.closePath(); };
   g.save(); g.lineJoin = 'round';
-  P([[245, 40], [555, 40], [760, 245], [760, 555], [555, 760], [245, 760], [40, 555], [40, 245]]); g.fillStyle = '#fed317'; g.fill();
+  P([[245, 40], [555, 40], [760, 245], [760, 555], [555, 760], [245, 760], [40, 555], [40, 245]]); g.fillStyle = '#f2b400'; g.fill(); g.lineWidth = 14 * k; g.strokeStyle = '#111'; g.stroke();
   P([[295, 145], [505, 145], [655, 295], [655, 505], [505, 655], [295, 655], [145, 505], [145, 295]]); g.fillStyle = '#ffffff'; g.fill();
   P([[308, 180], [492, 180], [620, 308], [620, 492], [492, 620], [308, 620], [180, 492], [180, 308]]); g.fillStyle = '#202020'; g.fill();
   g.fillStyle = '#ffffff';
@@ -40,9 +40,9 @@ function oktagonLogo(g, cx, cy, w, mmaColor = '#111111') {
   const fs = w * 0.16; g.font = `900 ${fs}px "Russo One", "Arial Black", sans-serif`; g.textBaseline = 'middle'; g.textAlign = 'left';
   const word = 'OKTAG', ww = g.measureText(word).width, nW = g.measureText('N').width, mark = fs * 1.05, total = ww + mark + nW + fs * 0.08;
   let x = cx - total / 2;
-  g.fillStyle = '#fed317'; g.fillText(word, x, cy); x += ww + fs * 0.02;
+  g.lineWidth = fs * 0.06; g.strokeStyle = '#111'; g.strokeText(word, x, cy); g.fillStyle = '#f2b400'; g.fillText(word, x, cy); x += ww + fs * 0.02;
   oktagonMark(g, x + mark / 2, cy, mark); x += mark + fs * 0.06;
-  g.fillStyle = '#fed317'; g.fillText('N', x, cy);
+  g.strokeText('N', x, cy); g.fillStyle = '#f2b400'; g.fillText('N', x, cy);
   g.fillStyle = mmaColor; g.font = `900 ${fs * 0.55}px "Russo One", "Arial Black", sans-serif`; g.textAlign = 'center'; g.fillText('MMA', cx, cy + fs * 0.85);
   g.restore();
 }
@@ -60,13 +60,15 @@ export class MMA {
     // podlaha oktagonu (plachta s logem a červeným osmiúhelníkem)
     const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
     const cg = cv.getContext('2d');
-    cg.fillStyle = '#ebe9e3'; cg.fillRect(0, 0, 1024, 1024);
+    cg.fillStyle = '#d8d6cf'; cg.fillRect(0, 0, 1024, 1024);
     for (let i = 0; i < 5000; i++) { cg.fillStyle = `rgba(0,0,0,${Math.random() * 0.03})`; cg.fillRect(Math.random() * 1024, Math.random() * 1024, 3, 3); }
     const oct = (r) => { cg.beginPath(); for (let k = 0; k <= 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; cg.lineTo(512 + Math.cos(a) * r, 512 + Math.sin(a) * r); } };
     cg.strokeStyle = '#b11d1d'; cg.lineWidth = 12; oct(480); cg.stroke();
     // logo OKTAGON MMA uprostřed plachty
-    oktagonMark(cg, 512, 400, 330);
-    oktagonLogo(cg, 512, 680, 620, '#111111');
+    cg.save(); cg.shadowColor = 'rgba(0,0,0,.55)'; cg.shadowBlur = 0; cg.shadowOffsetX = 6; cg.shadowOffsetY = 6;
+    oktagonMark(cg, 512, 400, 340);
+    oktagonLogo(cg, 512, 690, 660, '#111111');
+    cg.restore();
     const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
     // osmiboká plošina (CylinderGeometry s 8 stranami = oktagon)
     const deck = new THREE.Mesh(new THREE.CylinderGeometry(R, R, DECK, 8, 1), [mat('#1a1a1a'), new THREE.MeshStandardMaterial({ map: ft, roughness: 0.9 }), mat('#1a1a1a')]);
@@ -522,10 +524,15 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     this.phase = 'teardown'; this.t = 0; this.status = 'Vězni odcházejí na oddíly · přijíždí technika';
     for (const f of [...this.all, this.ref]) this.game.scene.remove(f.m);
     if (this.mc && !this.mc.gone) this.game.scene.remove(this.mc.m);
-    // diváci a bachaři: každý jde k nejbližším dveřím svého baráku a zaleze dovnitř
-    const B = MMA.BARRACKS;
-    for (const f of this.fans) { const d = B[Math.floor(Math.random() * B.length)]; f.tx = d[0] + (Math.random() - 0.5) * 2; f.tz = d[1] + (Math.random() - 0.5) * 2; f.sp = 1.3 + Math.random() * 0.6; f.delay = Math.random() * 6; f.gone = false; }
-    for (const p of this.guardPos) { const d = B[Math.floor(Math.random() * B.length)]; p.tx = d[0]; p.tz = d[1]; p.sp = 1.5; p.delay = 3 + Math.random() * 5; }
+    // diváci a bachaři: branou ve vnitřní zdi ven ze dvora, směrem k jídelně a budově C, odtud se rozejdou na L, M a K
+    const J = () => (Math.random() - 0.5) * 1.6;
+    const route = () => {
+      const hub = Math.random() < 0.5 ? [-300 + J() * 3, 1074 + J() * 2] : [-242 + J() * 3, 1060 + J() * 2]; // u jídelny / u budovy C
+      const fin = [[-360, 1065.6], [-350.8, 1116], [-174.5, 1046], [-174.5, 1068], [-156, 1094]][Math.floor(Math.random() * 5)]; // L, M, K
+      return [[-262 + J(), 1128 + J()], [-266.3 + J() * 0.5, 1120.6], [-266.3 + J() * 0.5, 1110], [-266 + J(), 1096 + J()], [-268 + J(), 1070 + J()], hub, [fin[0] + J(), fin[1] + J()]];
+    };
+    for (const f of this.fans) { f.route = route(); f.ri = 0; f.sp = 1.3 + Math.random() * 0.6; f.delay = Math.random() * 10; f.gone = false; }
+    for (const p of this.guardPos) { p.route = route(); p.ri = 0; p.sp = 1.5; p.delay = 4 + Math.random() * 6; }
     for (const d of this.dogs) this.game.scene.remove(d.m);
     // dva dlouhé černé kamiony vjedou vjezdem zásobování
     const path = MMA.TRUCK_IN;
@@ -552,8 +559,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       if (this.crowd.dead[f.i]) { f.gone = true; continue; }
       left++;
       if ((f.delay -= dt) > 0) { this.crowd.set(f.i, f.x, f.y, f.z, f.h, 0, 'walk', t); continue; }
-      const dx = f.tx - f.x, dz = f.tz - f.z, d = Math.hypot(dx, dz);
-      if (d < 1.2 || this.t > 70) { f.gone = true; this.crowd.hide(f.i); continue; }
+      const wp = f.route[f.ri], dx = wp[0] - f.x, dz = wp[1] - f.z, d = Math.hypot(dx, dz);
+      if (d < 1.3) { if (++f.ri >= f.route.length) { f.gone = true; this.crowd.hide(f.i); } continue; }
+      if (this.t > 150) { f.gone = true; this.crowd.hide(f.i); continue; }
       f.x += (dx / d) * f.sp * dt; f.z += (dz / d) * f.sp * dt; f.h = Math.atan2(dx, dz); f.y = city.ground(f.x, f.z);
       this.crowd.set(f.i, f.x, f.y, f.z, f.h, f.sp, 'walk', t);
     }
@@ -561,8 +569,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     this.guardPos.forEach((p, i) => {
       if (p.gone || this.guards.dead[i]) return;
       if ((p.delay -= dt) > 0) { this.guards.set(i, p.x, p.y, p.z, p.h, 0, 'walk', t); return; }
-      const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz);
-      if (d < 1.2 || this.t > 70) { p.gone = true; this.guards.hide(i); return; }
+      const wp = p.route[p.ri], dx = wp[0] - p.x, dz = wp[1] - p.z, d = Math.hypot(dx, dz);
+      if (d < 1.3) { if (++p.ri >= p.route.length) { p.gone = true; this.guards.hide(i); } return; }
+      if (this.t > 150) { p.gone = true; this.guards.hide(i); return; }
       p.x += (dx / d) * p.sp * dt; p.z += (dz / d) * p.sp * dt; p.h = Math.atan2(dx, dz); p.y = city.ground(p.x, p.z);
       this.guards.set(i, p.x, p.y, p.z, p.h, p.sp, 'walk', t);
     });
