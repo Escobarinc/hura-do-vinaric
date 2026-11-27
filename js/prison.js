@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127231721';
-import { labelTexture } from './textures.js?v=20261127231721';
-import { Crowd } from './crowd.js?v=20261127231721';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127234448';
+import { labelTexture } from './textures.js?v=20261127234448';
+import { Crowd } from './crowd.js?v=20261127234448';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1241,6 +1241,8 @@ export class PrisonLife {
     add('🚨 Policejní zásah', () => this.startRiot());
     add('🥊 MMA zápas', () => this.openMmaPicker(false));
     add('🎉 PARTY', () => this.game.party.start());
+    add('🦸 AVENGERS', () => this.game.party.avengers());
+    add('🌀 STARGATE', () => this.game.party.stargate());
     add('🥊 MMA – hraj za vězně', () => { const M = this.game.mma; if (M.active) M.takeOver(); else this.openMmaPicker(true); });
     add('🔄 Restart', () => this.resetAll());
     add('📍 Teleport (T)', () => this.game.hud.openTeleport(this.game));

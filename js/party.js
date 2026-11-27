@@ -4,8 +4,9 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127231721';
-import { Crowd } from './crowd.js?v=20261127231721';
+import { makeHuman, animateHuman } from './entities.js?v=20261127234448';
+import { Avengers } from './avengers.js?v=20261127234448';
+import { Crowd } from './crowd.js?v=20261127234448';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -72,6 +73,7 @@ export class Party {
     this.game = game; this.active = false;
     this.fx = Object.fromEntries(EFFECTS.map(([k]) => [k, ['lasers', 'fan', 'heads', 'walls', 'led', 'beat', 'ceiling', 'strings', 'flames', 'confetti', 'ball', 'fog'].includes(k)]));
     this.speed = 1; this.color = 0; this.master = 1; this.lightStyle = 'auto';
+    this.S = S; this.FACE = FACE; this.RW = RW; this.av = new Avengers(this);
   }
 
   start() {
@@ -84,6 +86,7 @@ export class Party {
     this.makePanel();
     this.makePlayer();
     this.setTrack(0);
+    this.av.hookFloor();
     G.toast?.('🎉 PARTY! Ovládání světel vpravo · tlačítko PARTY znovu = konec');
   }
 
@@ -111,6 +114,13 @@ export class Party {
     this.ledC = document.createElement('canvas'); this.ledC.width = 512; this.ledC.height = 256;
     this.ledT = new THREE.CanvasTexture(this.ledC); this.ledT.colorSpace = THREE.SRGBColorSpace;
     this.led = add(new THREE.Mesh(new THREE.PlaneGeometry(14, 7), new THREE.MeshBasicMaterial({ map: this.ledT })), ...P(-3.7, 0, 5.6), FACE);
+    // boční obrazovky: vyjedou do stran a obraz se roztáhne přes všechny tři (široké plátno, každá ukazuje třetinu)
+    this.ledWC = document.createElement('canvas'); this.ledWC.width = 1536; this.ledWC.height = 256;
+    const wt = new THREE.CanvasTexture(this.ledWC); wt.colorSpace = THREE.SRGBColorSpace; wt.repeat.set(1 / 3, 1);
+    this.ledW = [wt, wt.clone(), wt.clone()]; this.ledW.forEach((tx, k) => { tx.offset.x = k / 3; });
+    this.ledMain = this.led.material; this.ledMid = new THREE.MeshBasicMaterial({ map: this.ledW[1] });
+    this.ledSide = [-1, 1].map((sd) => { const m = add(new THREE.Mesh(new THREE.PlaneGeometry(14, 7), new THREE.MeshBasicMaterial({ map: this.ledW[sd < 0 ? 0 : 2] })), ...P(-3.75, 0, 5.6), FACE); const fr = new THREE.Mesh(new THREE.BoxGeometry(14.3, 7.3, 0.25), black); fr.position.z = -0.15; m.add(fr); m.visible = false; return { m, sd }; });
+    this.led3 = false; this.led3k = 0;
     // nápis DJ nad pódiem
     const sc = document.createElement('canvas'); sc.width = 1024; sc.height = 160; const sg = sc.getContext('2d');
     sg.fillStyle = '#000'; sg.fillRect(0, 0, 1024, 160); sg.font = '900 110px "Russo One", sans-serif'; sg.textAlign = 'center'; sg.textBaseline = 'middle';
@@ -243,7 +253,7 @@ export class Party {
       if (f > 2 && f < RW.f1 + 12 && Math.abs(r) < 16) { const cf = Math.max(RW.f0, Math.min(RW.f1, f)), tx = S.x + fx * cf, tz = S.z + fz * cf; p.h2 = Math.atan2(tx - p.x, tz - p.z); }
     }
     // oblečení: pestré barvy triček
-    for (const p of this.people) this.crowd.setShirt(p.i, COLORS[Math.floor(Math.random() * COLORS.length)]);
+    for (const p of this.people) { p.col = COLORS[Math.floor(Math.random() * COLORS.length)]; this.crowd.setShirt(p.i, p.col); }
     /* ---------------- SVĚTLA ---------------- */
     const add2 = (m) => { g.add(m); return m; };
     const beamMat = (c, o = 0.55) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: o, blending: THREE.AdditiveBlending, depthWrite: false });
@@ -337,6 +347,7 @@ export class Party {
     document.head.appendChild(css);
     const d = document.createElement('div'); d.id = 'party-panel';
     d.innerHTML = `<h3>🎛️ Světelný pult <span><button class="min" data-a="min">–</button><button class="min" data-a="end">✕</button></span></h3><div class="body"><div class="grid">${EFFECTS.map(([k, l], i) => `<button data-fx="${k}" class="${this.fx[k] ? 'on' : ''}">${i + 1}. ${l}</button>`).join('')}</div>
+<div class="row"><button data-a="led3">📺 3 obrazovky vedle sebe</button></div>
 <div class="row">Styl <button data-style="auto" class="on">AUTO</button><button data-style="disco">DISKO</button><button data-style="hiphop">HIP HOP</button></div>
 <div class="row">Rychlost <input type="range" min="0.3" max="3" step="0.1" value="1" data-a="speed"></div>
 <div class="row">Jas <input type="range" min="0.2" max="1.5" step="0.05" value="1" data-a="master"></div>
@@ -351,6 +362,7 @@ export class Party {
       if (b.dataset.style) { this.lightStyle = b.dataset.style; d.querySelectorAll('[data-style]').forEach((x) => x.classList.toggle('on', x === b)); }
       if (b.dataset.col) { this.color = +b.dataset.col; this.fx.rainbow = false; d.querySelector('[data-fx=rainbow]').classList.remove('on'); }
       const a = b.dataset.a;
+      if (a === 'led3') { this.led3 = !this.led3; b.classList.toggle('on', this.led3); this.game.audio?.noise?.(0.8, 0.2, 110); }
       if (a === 'min') d.classList.toggle('collapsed');
       if (a === 'end') this.stop();
       if (a === 'all' || a === 'none' || a === 'rnd') for (const [k] of EFFECTS) { this.fx[k] = a === 'all' ? true : a === 'none' ? false : Math.random() < 0.55; d.querySelector(`[data-fx=${k}]`).classList.toggle('on', this.fx[k]); }
@@ -397,6 +409,10 @@ export class Party {
     this.washL2.color.copy(col(1)); this.washL2.intensity = 80 * M * (0.55 + (1 - pulse) * 0.5);
     this.edge.material.color.copy(col(2));
     // LED stěna
+    this.led3k += ((this.led3 ? 1 : 0) - this.led3k) * Math.min(1, dt * 1.8);
+    const wide = this.led3k > 0.03;
+    this.led.material = wide ? this.ledMid : this.ledMain;
+    for (const sd of this.ledSide) { sd.m.visible = F.led && wide; const [lx, ly, lz] = this.P(-3.75, sd.sd * 14.15 * this.led3k, 5.6); sd.m.position.set(lx, ly, lz); }
     this.led.visible = F.led; if (F.led) this.drawLed(t, beat, col);
     // plameny, CO2
     for (const Fl of this.flames) { const burst = F.flames && ((bar % 2 === 0 && beat < 0.35) || F.mega); Fl.sp.visible = burst; if (burst) { const h = 2.5 + Math.random() * 1.5; Fl.sp.scale.set(1.4, h, 1); Fl.sp.position.y = Fl.y + h / 2 - 0.5; } }
@@ -419,33 +435,34 @@ export class Party {
     this.animatePeople(dt, beatF, pulse);
     this.updateRunway(dt, col);
     this.updatePerformers(dt, mt, beatF);
+    this.av.update(dt, beatF);
   }
   drawLed(t, beat, col) {
-    const c = this.ledC, g = c.getContext('2d'), w = c.width, h = c.height;
+    const wideL = this.led3k > 0.03, c = wideL ? this.ledWC : this.ledC, g = c.getContext('2d'), w = c.width, h = c.height;
     const tr = TRACKS[this.ti] || TRACKS[0], mode = Math.floor(t / 5) % 4;
     g.fillStyle = '#000'; g.fillRect(0, 0, w, h);
     // efekt v pozadí
-    if (mode === 0) { for (let k = 0; k < 16; k++) { g.fillStyle = '#' + col(k).getHexString(); const bh = (0.2 + Math.abs(Math.sin(t * 3 + k * 0.7)) * 0.8) * h * (1 - beat * 0.4); g.fillRect(k * w / 16 + 2, h - bh, w / 16 - 4, bh); } }
-    else if (mode === 1) { for (let r = 0; r < 8; r++) { g.strokeStyle = '#' + col(r).getHexString(); g.lineWidth = 6; g.beginPath(); g.arc(w / 2, h / 2, ((t * 80 + r * 40) % 320), 0, 7); g.stroke(); } }
-    else if (mode === 2) { for (let k = 0; k < 12; k++) { g.fillStyle = '#' + col(k).getHexString(); g.globalAlpha = 0.7; const x = ((t * 140 + k * 90) % (w + 120)) - 60; g.fillRect(x, 0, 26, h); } g.globalAlpha = 1; }
-    else { for (let k = 0; k < 400; k++) { g.fillStyle = '#' + col(k).getHexString(); g.fillRect(Math.random() * w, Math.random() * h, 6, 6); } g.fillStyle = 'rgba(255,255,255,' + (1 - beat) * 0.3 + ')'; g.fillRect(0, 0, w, h); }
+    if (mode === 0) { { const nb = wideL ? 48 : 16; for (let k = 0; k < nb; k++) { g.fillStyle = '#' + col(k).getHexString(); const bh = (0.2 + Math.abs(Math.sin(t * 3 + k * 0.7)) * 0.8) * h * (1 - beat * 0.4); g.fillRect(k * w / nb + 2, h - bh, w / nb - 4, bh); } } }
+    else if (mode === 1) { for (let r = 0; r < (wideL ? 22 : 8); r++) { g.strokeStyle = '#' + col(r).getHexString(); g.lineWidth = 6; g.beginPath(); g.arc(w / 2, h / 2, ((t * 80 + r * 40) % (w * 0.62)), 0, 7); g.stroke(); } }
+    else if (mode === 2) { for (let k = 0; k < (wideL ? 30 : 12); k++) { g.fillStyle = '#' + col(k).getHexString(); g.globalAlpha = 0.7; const x = ((t * 140 + k * 90) % (w + 120)) - 60; g.fillRect(x, 0, 26, h); } g.globalAlpha = 1; }
+    else { for (let k = 0; k < (wideL ? 1100 : 400); k++) { g.fillStyle = '#' + col(k).getHexString(); g.fillRect(Math.random() * w, Math.random() * h, 6, 6); } g.fillStyle = 'rgba(255,255,255,' + (1 - beat) * 0.3 + ')'; g.fillRect(0, 0, w, h); }
     // text přes efekt: střídá se název písně, interpret, kdo rapuje
     const step = Math.floor(t / 2.5) % 4;
     let txt = null, small = null;
     if (tr.genre === 'hiphop') {
-      const name = this.curRapper;
+      const name = this.heroSinger || this.curRapper;
       txt = step === 0 ? tr.title.toUpperCase() : step === 1 ? null : step === 2 ? (name ? '🎤 ' + name.toUpperCase() : tr.led[0]) : tr.led[beat < 0.5 ? 0 : 1];
       if (step === 0) small = tr.artist;
     } else txt = step % 2 ? tr.led[beat < 0.5 ? 0 : 1] : (step === 0 ? 'DJ TIËSTO' : null);
     if (txt) {
       g.fillStyle = 'rgba(0,0,0,.45)'; g.fillRect(0, h * 0.22, w, h * (small ? 0.62 : 0.56));
-      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = '900 72px "Russo One", sans-serif';
+      g.textAlign = 'center'; g.textBaseline = 'middle'; g.font = `900 ${wideL ? 120 : 72}px "Russo One", sans-serif`;
       g.shadowColor = '#' + col(2).getHexString(); g.shadowBlur = 20; g.fillStyle = '#fff'; g.globalAlpha = 0.75 + (1 - beat) * 0.25;
       g.fillText(txt, w / 2, small ? h * 0.44 : h / 2, w - 30);
       if (small) { g.font = '700 26px "Chakra Petch", sans-serif'; g.shadowBlur = 8; g.fillText(small, w / 2, h * 0.7, w - 30); }
       g.globalAlpha = 1; g.shadowBlur = 0;
     }
-    this.ledT.needsUpdate = true;
+    if (wideL) this.ledW[0].needsUpdate = true; else this.ledT.needsUpdate = true;
   }
   firework() {
     const n = 90, pos = new Float32Array(n * 3), vel = [], c = new THREE.Color(COLORS[Math.floor(Math.random() * 8)]);
@@ -501,7 +518,9 @@ export class Party {
     C.updateCorpses(dt, (x, z) => this.game.city.ground(x, z), () => {});
     const hip = TRACKS[this.ti]?.genre === 'hiphop'; C.beatF = beatF;
     for (const p of this.people) {
-      if (C.dead[p.i]) continue;
+      if (C.dead[p.i] || p.gone) continue;
+      if (p.st) { this.av.stepPerson(p, dt, t, beatF, hip); continue; }
+      if (p.web > 0) { p.web -= dt; C.set(p.i, C.x[p.i], p.y, C.z[p.i], p.h, 0, 'kneel', t); if (p.web <= 0) C.setShirt(p.i, p.col); continue; }
       if (p.bar) { C.set(p.i, p.x, p.y, p.z, p.h, 0, Math.sin(t * 1.3 + p.ph) > 0.7 ? 'smoke' : 'walk', t); continue; }
       const L = this.rw?.L || 0, st2 = L > 1.5;
       if (p.ax != null) { const need = L > p.rf - RW.f0 - 1.2; p.m = Math.max(0, Math.min(1, p.m + (need ? dt * 1.6 : -dt * 0.8))); }
@@ -573,6 +592,10 @@ export class Party {
     }
     g.shadowBlur = 0; this.bannerT.needsUpdate = true;
   }
+  /** Menu: AVENGERS / STARGATE (party se případně sama spustí). */
+  avengers() { if (!this.active) this.start(); this.av.summon(); }
+  stargate() { if (!this.active) this.start(); this.av.toggleGate(); }
+  syncStage2() { const b = this.player?.querySelector('[data-p=stage2]'); if (b) { b.classList.toggle('on', !!this.stage2); b.textContent = this.stage2 ? 'STAGE 2 ✕' : 'STAGE 2'; } }
   toggleStage2() {
     this.stage2 = !this.stage2; this.rw.goal = this.stage2 ? RW.f1 - RW.f0 : 0;
     this.game.audio?.noise?.(1.2, 0.25, 120);
@@ -642,6 +665,7 @@ export class Party {
     const bounce = Math.max(0, Math.sin(beatF * Math.PI * 2)) * 0.12;
     let busy = 0;
     for (const R of this.rappers) {
+      if (R.gone) continue;
       R.t += dt;
       if ((R.m.position.x - S.x) * Math.sin(FACE) + (R.m.position.z - S.z) * Math.cos(FACE) > RW.f0 - 0.2) busy++;
       const active = who === -1 || who === R.k;
@@ -655,6 +679,7 @@ export class Party {
         const onRw = this.stage2 && L > rf - RW.f0 + 0.5;
         let hx = R.tx, hz = R.tz;
         if (onRw) { hx = S.x + Math.sin(FACE) * rf + Math.cos(FACE) * rr; hz = S.z + Math.cos(FACE) * rf - Math.sin(FACE) * rr; }
+        if (R.leave) { hx = R.leave[0]; hz = R.leave[1]; }
         // cesta: z pódia na molo (a zpět) jen přes jeho začátek, ne vzduchem
         const lf = (q, w) => (q - S.x) * Math.sin(FACE) + (w - S.z) * Math.cos(FACE), lr = (q, w) => (q - S.x) * Math.cos(FACE) - (w - S.z) * Math.sin(FACE);
         const cf = lf(R.cx, R.cz), cr = lr(R.cx, R.cz), hf = lf(hx, hz);
@@ -667,6 +692,7 @@ export class Party {
         if (dd > 0.08) { const st = Math.min(dd, dt * 3.6); R.cx += (gx - R.cx) / dd * st; R.cz += (gz - R.cz) / dd * st; speed = 2.6; face = Math.atan2(gx - R.cx, gz - R.cz); x = R.cx; z = R.cz; R.walking = true; }
         else {
           R.walking = false; R.cx = hx; R.cz = hz;
+          if (R.leave) { R.gone = true; R.m.visible = false; R.mic.visible = false; R.spot.visible = false; this.av.flash(hx, R.y + 1.5, hz, 5, '#9fd8ff'); this.game.audio?.blip?.(500, 0.3, 'sine', 0.08, 1600); continue; }
           const inRw = lf(R.cx, R.cz) > RW.f0 + 0.3;
           if (poleDance && R.pole && R.pole.h > -0.3 && !inRw) { const a = t * 1.1 + R.ph; x = R.pole.x + Math.cos(a) * 0.42; z = R.pole.z + Math.sin(a) * 0.42; face = Math.atan2(R.pole.x - x, R.pole.z - z) + Math.PI / 2 + Math.sin(t * 2.4 + R.ph) * 0.35; }
           else if (inRw) { const side = lr(R.cx, R.cz) < 0 ? -1 : 1; x = R.cx + Math.sin(FACE) * Math.sin(t * 0.9 + R.ph) * (active ? 0.6 : 0.2); z = R.cz + Math.cos(FACE) * Math.sin(t * 0.9 + R.ph) * (active ? 0.6 : 0.2); face = FACE + side * (Math.PI / 2) * (0.5 + 0.5 * Math.sin(t * 0.7 + R.ph)) ; }
@@ -705,7 +731,7 @@ export class Party {
   targets() {
     if (!this.active) return [];
     const C = this.crowd, out = [];
-    for (const p of this.people) if (!C.dead[p.i]) out.push({ key: `party:${p.i}`, crowd: C, ci: p.i, mesh: { position: { x: C.x[p.i], y: C.y[p.i], z: C.z[p.i] } }, kill: (dir, boom) => C.kill(p.i, dir, boom?.vel || null) });
+    for (const p of this.people) if (!C.dead[p.i] && !p.gone) out.push({ key: `party:${p.i}`, crowd: C, ci: p.i, mesh: { position: { x: C.x[p.i], y: C.y[p.i], z: C.z[p.i] } }, kill: (dir, boom) => C.kill(p.i, dir, boom?.vel || null) });
     return out;
   }
 
@@ -714,6 +740,7 @@ export class Party {
     const G = this.game;
     this.active = false;
     this.music?.pause(); this.music = null;
+    this.av.stop();
     this.clearPerformers(); this.poles = []; this.player?.remove(); this.player = null;
     G.scene.remove(this.group);
     for (const m of [this.dj, ...this.gogos.map((d) => d.m), ...this.bartenders.map((b) => b.m)]) G.scene.remove(m);
