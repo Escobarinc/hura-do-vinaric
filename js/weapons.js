@@ -154,6 +154,18 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     const pl = this.game.prisonLife;
     if (pl) for (const p of pl.pool) if (p.used && !p.dead && p.mesh.visible) out.push({ mesh: p.mesh, kill: (dir, boom) => { p.dead = true; this.corpse(p.mesh, dir, boom, p); } });
     if (pl?.crowdTargets) out.push(...pl.crowdTargets());
+    // hlídkující dozorci (psovod a dvojice na cestě)
+    for (const p of this.game.prisonFx?.patrols || []) for (const k of ['guard', 'mate']) {
+      const m = p[k];
+      if (m && m.visible && !p[k + 'Dead']) out.push({ mesh: m, patrol: p, kill: (dir, boom) => { p[k + 'Dead'] = true; this.corpse(m, dir, boom, null); } });
+    }
+    // vězni na dvorech (fotbal, hrazdy, kuřáci, telefon, kotce u K)
+    const Y = this.game.prisonFx?.yardCrowd;
+    if (Y) for (let i = 0; i < Y.cap; i++) {
+      if (!Y.vis[i] || Y.dead[i]) continue;
+      Y._uid ||= 'yard';
+      out.push({ key: `yard:${i}`, crowd: Y, ci: i, mesh: { position: { x: Y.x[i], y: Y.y[i], z: Y.z[i] } }, kill: (dir, boom) => Y.kill(i, dir, boom?.vel || null) });
+    }
     return out;
   }
 
@@ -657,6 +669,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     }
     G.audio?.noise?.(0.06, 0.18, 1800); // švih
     if (!best) return;
+    if (best.patrol) best.patrol.stopT = 10; // hlídka se zastaví a pere se
     const q = best.mesh.position, D = new THREE.Vector3(fx, 0, fz);
     const key = best.key || best.mesh;
     this.punchHp ||= new Map();
@@ -683,6 +696,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       const q = t.crowd ? { x: t.crowd.x[t.ci], y: t.crowd.y[t.ci], z: t.crowd.z[t.ci] } : t.mesh.position;
       const dx = P.x - q.x, dz = P.z - q.z, d = Math.hypot(dx, dz);
       if (!alive || d > 9 || G.mode !== 'foot' || P.hp <= 0) { this.fighters.splice(i, 1); continue; }
+      if (t.patrol) t.patrol.stopT = 4;
       const h = Math.atan2(dx, dz);
       if (t.crowd) t.crowd.h[t.ci] = h;
       else {

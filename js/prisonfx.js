@@ -10,11 +10,11 @@
  * Souřadnice světa: x = východ, z = jih.
  */
 import * as THREE from 'three';
-import { Crowd } from './crowd.js?v=20261127142210';
-import { makeHuman, animateHuman } from './entities.js?v=20261127142210';
-import { labelTexture } from './textures.js?v=20261127142210';
-import { BACKYARD } from './world.js?v=20261127142210';
-import { pointInPoly } from './util.js?v=20261127142210';
+import { Crowd } from './crowd.js?v=20261127142451';
+import { makeHuman, animateHuman } from './entities.js?v=20261127142451';
+import { labelTexture } from './textures.js?v=20261127142451';
+import { BACKYARD } from './world.js?v=20261127142451';
+import { pointInPoly } from './util.js?v=20261127142451';
 
 const AREA = { x0: -462, x1: -42, z0: 988, z1: 1236 }; // obdélník kolem areálu
 const DOORS = [ // vchody, odkud vychází oddíly (plechové dveře se stříškou)
@@ -401,6 +401,7 @@ export class PrisonFX {
         C.set(a.id, a.x, G(a.x, a.z), a.z, a.h, v, 'walk', t);
       }
     }
+    C.updateCorpses(dt, (x, z) => G(x, z), () => {});
     C.commit();
     this.updateKennelDogs(dt, t);
   }
@@ -454,14 +455,16 @@ export class PrisonFX {
     const at = (P, s) => { for (let i = 1; i < P.pts.length; i++) if (s <= P.cum[i]) { const k = (s - P.cum[i - 1]) / (P.cum[i] - P.cum[i - 1] || 1), a = P.pts[i - 1], b = P.pts[i]; return [a[0] + (b[0] - a[0]) * k, a[1] + (b[1] - a[1]) * k, Math.atan2(b[0] - a[0], b[1] - a[1])]; } const a = P.pts[P.pts.length - 2], b = P.pts[P.pts.length - 1]; return [b[0], b[1], Math.atan2(b[0] - a[0], b[1] - a[1])]; };
     for (const p of this.patrols) {
       const vis = near;
-      p.guard.visible = vis; if (p.dog) p.dog.visible = vis; if (p.mate) p.mate.visible = vis;
+      p.guard.visible = vis || p.guardDead; if (p.dog) p.dog.visible = vis; if (p.mate) p.mate.visible = vis || p.mateDead;
       if (!vis) continue;
+      // rvačka s hráčem nebo složený dozorce: hlídka stojí (pozici řídí souboj / leží tělo)
+      if (p.stopT > 0 || p.guardDead) { p.stopT = Math.max(0, (p.stopT || 0) - dt); continue; }
       p.s += p.v * p.dir * dt;
       if (p.s > p.path.len) { p.s = p.path.len; p.dir = -1; } else if (p.s < 0) { p.s = 0; p.dir = 1; }
       const [x, z, h0] = at(p.path, p.s), h = p.dir > 0 ? h0 : h0 + Math.PI, nx = Math.cos(h), nz = -Math.sin(h);
       p.guard.position.set(x, this.G(x, z), z); p.guard.rotation.y = h;
       animateHuman(p.guard, p.v, dt, 'walk');
-      if (p.mate) { const mx = x + nx * 0.9, mz = z + nz * 0.9; p.mate.position.set(mx, this.G(mx, mz), mz); p.mate.rotation.y = h; animateHuman(p.mate, p.v, dt, 'walk'); }
+      if (p.mate && !p.mateDead) { const mx = x + nx * 0.9, mz = z + nz * 0.9; p.mate.position.set(mx, this.G(mx, mz), mz); p.mate.rotation.y = h; animateHuman(p.mate, p.v, dt, 'walk'); }
       if (p.dog) {
         const dx = x - nx * 0.9 + Math.sin(h) * 0.6, dz = z - nz * 0.9 + Math.cos(h) * 0.6;
         p.dog.position.set(dx, this.G(dx, dz), dz); p.dog.rotation.y = h;
