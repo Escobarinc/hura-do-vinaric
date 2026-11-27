@@ -1,10 +1,11 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127204246';
-import { PrisonLife } from './prison.js?v=20261127204246';
-import { Weapons } from './weapons.js?v=20261127204246';
-import { MMA } from './mma.js?v=20261127204246';
-import { PrisonFX } from './prisonfx.js?v=20261127204246';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127204246';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127210238';
+import { PrisonLife } from './prison.js?v=20261127210238';
+import { Weapons } from './weapons.js?v=20261127210238';
+import { MMA } from './mma.js?v=20261127210238';
+import { Party } from './party.js?v=20261127210238';
+import { PrisonFX } from './prisonfx.js?v=20261127210238';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127210238';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -76,6 +77,7 @@ export class Game {
     this.weapons = new Weapons(this);
     try { this.prisonFx = new PrisonFX(this); } catch (e) { console.warn('vylepšení věznice', e); }
     this.mma = new MMA(this);
+    this.party = new Party(this);
     // start uvnitř věznice Vinařice (u budovy C, vedle auto, motorka a vrtulník)
     if (city.prison) { this.arrivePrison(true); this.camFar = true; }
   }
@@ -354,7 +356,8 @@ export class Game {
     else if (this.mode === 'jet') this.updateJet(dt);
     else if (this.mode === 'trolley') this.updateRide(dt);
     else if (this.mode === 'mma') this.mma.update(dt);
-    if (this.mma?.active && this.mode !== 'mma') this.mma.update(dt); // divák: zápas běží, hráč se volně pohybuje
+    if (this.mma?.active && this.mode !== 'mma') this.mma.update(dt);
+    if (this.party?.active) this.party.update(dt); // divák: zápas běží, hráč se volně pohybuje
 
     this.updateFallingAircraft(dt);
     if (inp.hit('KeyE')) this.handleE();

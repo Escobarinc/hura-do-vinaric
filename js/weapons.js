@@ -156,6 +156,7 @@ font:700 13px "Chakra Petch",sans-serif;color:#eef2f5;background:rgba(14,18,23,.
     if (pl?.crowdTargets) out.push(...pl.crowdTargets());
     // diváci a bachaři u oktagonu (MMA)
     if (this.game.mma?.active) out.push(...this.game.mma.targets());
+    if (this.game.party?.active) out.push(...this.game.party.targets());
     // hlídkující dozorci (psovod a dvojice na cestě)
     for (const p of this.game.prisonFx?.patrols || []) for (const k of ['guard', 'mate']) {
       const m = p[k];
