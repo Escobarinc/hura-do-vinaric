@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127202856';
-import { buildWorld } from './world.js?v=20261127202856';
-import { loadModels } from './models.js?v=20261127202856';
-import { Game } from './game.js?v=20261127202856';
-import { Hud } from './hud.js?v=20261127202856';
-import { Input } from './input.js?v=20261127202856';
-import { PrisonFX } from './prisonfx.js?v=20261127202856';
-import { Audio } from './audio.js?v=20261127202856';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127202856';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127204246';
+import { buildWorld } from './world.js?v=20261127204246';
+import { loadModels } from './models.js?v=20261127204246';
+import { Game } from './game.js?v=20261127204246';
+import { Hud } from './hud.js?v=20261127204246';
+import { Input } from './input.js?v=20261127204246';
+import { PrisonFX } from './prisonfx.js?v=20261127204246';
+import { Audio } from './audio.js?v=20261127204246';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127204246';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -101,6 +101,7 @@ const audio = new Audio();
 
 /** Nápověda s klávesovými zkratkami: Tab, F1, ?, tlačítko vlevo nahoře nebo křížek. */
 const tbUp = $('tb-up'), tbDown = $('tb-down');
+let jHold = 0, jOff = false;
 
 // telefony (hlavně iPhone) pustí zvuk a hlášení rozhlasu až po dotyku: při každém dotyku probudíme zvuk,
 // při prvním dotyku odemkneme hlasový výstup tichou větou
@@ -378,7 +379,9 @@ async function run(city, progress) {
     if (input.hit('KeyN')) { if (hud.teleportOpen) hud.closeTeleport(); else hud.openNav(game); }
     if (input.hit('KeyR')) game.restart();
     if (input.hit('KeyP') && !game.handleP()) cycleTime(); // P: katapultáž / padák, jinak denní doba
-    if (input.hit('KeyJ')) game.toggleJetpack();
+    // J: krátké stisknutí = zapnout / přepnout TURBO, podržení (0,6 s) = vypnout
+    if (input.down('KeyJ')) { jHold += dt; if (jHold > 0.6 && !jOff) { jOff = true; if (game.jetpack) game.toggleJetpack(false); } }
+    else { if (jHold > 0 && jHold <= 0.6 && !jOff) game.jetpackPress(); jHold = 0; jOff = false; }
     if (input.hit('Escape')) { hud.closeBigMap(); hud.closeTeleport(); $('controls').hidden = true; }
     paused = hud.bigMapOpen || hud.teleportOpen;
     if (!paused) {

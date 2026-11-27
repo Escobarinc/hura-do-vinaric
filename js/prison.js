@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127202856';
-import { labelTexture } from './textures.js?v=20261127202856';
-import { Crowd } from './crowd.js?v=20261127202856';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127204246';
+import { labelTexture } from './textures.js?v=20261127204246';
+import { Crowd } from './crowd.js?v=20261127204246';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1244,7 +1244,8 @@ export class PrisonLife {
     add('🔄 Restart', () => this.resetAll());
     add('📍 Teleport (T)', () => this.game.hud.openTeleport(this.game));
     add('🧭 Navigace (N)', () => this.game.hud.openNav(this.game));
-    add('🚀 Jetpack (J)', () => this.game.toggleJetpack());
+    add('🚀 Jetpack (J)', () => this.game.jetpackPress());
+    add('⛔ Jetpack vyp.', () => this.game.toggleJetpack(false));
     add(matchMedia('(pointer: coarse)').matches ? '❔ Ovládání' : '⌨️ Klávesy', () => { const c = document.getElementById('controls'); c.hidden = !c.hidden; if (!c.hidden && document.pointerLockElement) document.exitPointerLock(); });
     add('🔕 Vypnout sirénu', () => this.sirenOn(false));
     this.sirenBtn = box.lastChild;

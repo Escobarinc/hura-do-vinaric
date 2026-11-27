@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127202856';
-import { PrisonLife } from './prison.js?v=20261127202856';
-import { Weapons } from './weapons.js?v=20261127202856';
-import { MMA } from './mma.js?v=20261127202856';
-import { PrisonFX } from './prisonfx.js?v=20261127202856';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127202856';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127204246';
+import { PrisonLife } from './prison.js?v=20261127204246';
+import { Weapons } from './weapons.js?v=20261127204246';
+import { MMA } from './mma.js?v=20261127204246';
+import { PrisonFX } from './prisonfx.js?v=20261127204246';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127204246';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -387,7 +387,7 @@ export class Game {
     let sp = ml > 0.05 ? (sprint ? 8.2 : 4.3) * Math.min(1, ml) : 0;
     if (swimming) sp *= 0.45;
     const flying = this.jetpack && P.y > city.roofHeight(P.x, P.z, P.y + 0.6) + 0.3;
-    if (flying && ml > 0.05) sp = 13 * Math.min(1, ml); // jetpack: ve vzduchu rychleji (Shift tu znamená klesání)
+    if (flying && ml > 0.05) sp = (this.jetTurbo ? 65 : 13) * Math.min(1, ml); // jetpack: ve vzduchu rychleji, TURBO 5× (Shift tu znamená klesání)
     if (this.chute && ml > 0.05) sp = Math.max(sp, 7 * Math.min(1, ml)); // padák: klouzavý let
     if (ml > 0.05) {
       mx /= ml; mz /= ml;
@@ -405,7 +405,7 @@ export class Game {
       // jetpack: mezerník = tah nahoru, X = klesání, bez ovládání zůstane viset ve vzduchu
       thrust = inp.down('Space');
       const down = inp.down('KeyX', 'ControlLeft') || (sprint && P.y > floor + 0.3); // ve vzduchu Shift = dolů
-      if (thrust) P.vy = Math.min(9, P.vy + 26 * dt);
+      if (thrust) P.vy = Math.min(this.jetTurbo ? 30 : 9, P.vy + (this.jetTurbo ? 70 : 26) * dt);
       else if (down) P.vy = Math.max(-14, P.vy - 20 * dt);
       else if (P.y > floor + 0.3 && !this.chute && !this.freefall) P.vy *= Math.max(0, 1 - dt * 4); // bez ovládání visí ve vzduchu (klesá se jen na X)
       else if (this.chute || this.freefall) P.vy -= 15 * dt; // s padákem / po výskoku se padá (padák brzdí níže)
@@ -571,7 +571,14 @@ export class Game {
       this.jetMesh = g;
     }
     if (this.jetMesh) this.jetMesh.visible = on;
-    this.toast(on ? '🚀 Jetpack zapnutý · mezerník = nahoru, Shift (nebo X) = dolů, jinak zůstaneš viset ve vzduchu' : 'Jetpack vypnutý');
+    if (!on) this.jetTurbo = false;
+    this.toast(on ? '🚀 Jetpack zapnutý · J znovu = TURBO · podržet J = vypnout · mezerník nahoru, Shift dolů' : 'Jetpack vypnutý');
+  }
+  /** J krátce: vypnuto → zapnuto → TURBO (5×) → zapnuto …; podržet J = vypnout. */
+  jetpackPress() {
+    if (!this.jetpack) { this.toggleJetpack(true); return; }
+    this.jetTurbo = !this.jetTurbo;
+    this.toast(this.jetTurbo ? '🔥 Jetpack TURBO – 5× rychleji! (J = normální · podržet J = vypnout)' : '🚀 Jetpack normální rychlost (J = TURBO · podržet J = vypnout)');
   }
   updateJetpackFx(dt, thrust) {
     if (!this.jetMesh || !this.jetpack) return;
