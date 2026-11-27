@@ -4,14 +4,14 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127214230';
-import { Crowd } from './crowd.js?v=20261127214230';
+import { makeHuman, animateHuman } from './entities.js?v=20261127214429';
+import { Crowd } from './crowd.js?v=20261127214429';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
 const TRI = [[-300, 1126], [-126, 1115], [-208, 1207]]; // obrys zadního dvora
 const BPM = 122.7; // One More Time (výchozí)
-const RW = { f0: 4, f1: 13.5, w: 5 }; // molo STAGE 2: od přední hrany pódia k gogo pódiím
+const RW = { f0: 4, f1: 32.5, w: 5 }; // molo STAGE 2: od přední hrany pódia k gogo pódiím
 
 /* Písničky: parts = [čas (s), kdo rapuje (index, -1 = všichni, null = nikdo), 'pole' = tanec u tyče]. Časy podle hlasitosti skladby. */
 const TRACKS = [
@@ -559,7 +559,7 @@ export class Party {
   updateRunway(dt, col) {
     const R = this.rw; if (!R) return;
     const goal = this.stage2 ? R.goal : this.rwBusy ? R.L : 0; // nezajede, dokud na něm stojí rappeři
-    const d = goal - R.L; if (Math.abs(d) > 0.01) { R.L += Math.sign(d) * Math.min(Math.abs(d), dt * 2.4); if (Math.random() < dt * 3) this.game.audio?.noise?.(0.15, 0.08, 90); }
+    const d = goal - R.L; if (Math.abs(d) > 0.01) { R.L += Math.sign(d) * Math.min(Math.abs(d), dt * 5); if (Math.random() < dt * 3) this.game.audio?.noise?.(0.15, 0.08, 90); }
     R.g.visible = R.L > 0.02; R.g.scale.z = Math.max(0.001, R.L + 0.2);
     this.rwEnd.scale.z = 1 / R.g.scale.z; this.rwEnd.position.z = 1;
     for (const [k, m] of this.rwStrips.entries()) m.material.color.copy(col(k));
@@ -641,7 +641,7 @@ export class Party {
           if (Math.hypot(gx - R.cx, gz - R.cz) < 0.3) { gx = hx; gz = hz; }
         }
         const dd = Math.hypot(gx - R.cx, gz - R.cz);
-        if (dd > 0.08) { const st = Math.min(dd, dt * 2.6); R.cx += (gx - R.cx) / dd * st; R.cz += (gz - R.cz) / dd * st; speed = 2.6; face = Math.atan2(gx - R.cx, gz - R.cz); x = R.cx; z = R.cz; R.walking = true; }
+        if (dd > 0.08) { const st = Math.min(dd, dt * 3.6); R.cx += (gx - R.cx) / dd * st; R.cz += (gz - R.cz) / dd * st; speed = 2.6; face = Math.atan2(gx - R.cx, gz - R.cz); x = R.cx; z = R.cz; R.walking = true; }
         else {
           R.walking = false; R.cx = hx; R.cz = hz;
           const inRw = lf(R.cx, R.cz) > RW.f0 + 0.3;

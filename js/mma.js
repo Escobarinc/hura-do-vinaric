@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127214230';
-import { Crowd } from './crowd.js?v=20261127214230';
-import { PrisonFX } from './prisonfx.js?v=20261127214230';
+import { makeHuman, animateHuman } from './entities.js?v=20261127214429';
+import { Crowd } from './crowd.js?v=20261127214429';
+import { PrisonFX } from './prisonfx.js?v=20261127214429';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
