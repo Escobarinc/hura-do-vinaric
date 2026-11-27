@@ -144,7 +144,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.label.style.display = show ? 'block' : 'none';
     this.label.innerHTML = w
       ? `${w.icon} <b>${w.name}</b> <span>· K / myš = ${w.grenade ? 'hod' : 'střelba'} · Q / kolečko = další zbraň · 1–5 · 0 schovat</span>`
-      : '<span>Zbraně: Q nebo kolečko myši · 1 pistole · 2 brokovnice · 3 samopal · 4 granát · 5 bazuka</span>';
+      : '👊 <b>Pěsti</b> <span>· myš / F = rána · zbraně: Q nebo kolečko · 1 pistole · 2 brokovnice · 3 samopal · 4 granát · 5 bazuka</span>';
   }
 
   /* ---------- cíle ---------- */
@@ -639,6 +639,70 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     if (now - (this.jetSnd || 0) > 40) { this.jetSnd = now; this.game.audio?.noise?.(0.06, 0.45, 2600); }
   }
 
+  /**
+   * Pěstní souboj: rána tomu, kdo stojí před hráčem (do 1,7 m). Třetí rána ho složí k zemi.
+   * Platí pro chodce, vězně, dozorce, vzbouřence i policisty.
+   */
+  punch() {
+    const G = this.game, P = G.player;
+    G.punchT = 0.45;
+    P.mesh.userData.punchNew = true;
+    const fx = Math.sin(P.h), fz = Math.cos(P.h);
+    let best = null, bd = 1.7;
+    for (const t of this.targets()) {
+      const q = t.mesh.position, dx = q.x - P.x, dz = q.z - P.z, d = Math.hypot(dx, dz);
+      if (d > bd || Math.abs(q.y - P.y) > 1.2) continue;
+      if ((dx * fx + dz * fz) / (d || 1) < 0.35) continue; // jen před sebou
+      bd = d; best = t;
+    }
+    G.audio?.noise?.(0.06, 0.18, 1800); // švih
+    if (!best) return;
+    const q = best.mesh.position, D = new THREE.Vector3(fx, 0, fz);
+    const key = best.key || best.mesh;
+    this.punchHp ||= new Map();
+    const hp = (this.punchHp.get(key) ?? 3) - 1;
+    this.punchHp.set(key, hp);
+    this.bleed(new THREE.Vector3(q.x, q.y + 1.55, q.z), D, 4);
+    G.audio?.noise?.(0.09, 0.7, 320); G.audio?.blip?.(90, 0.08, 'square', 0.12, -40);
+    this.shake = Math.max(this.shake, 0.06);
+    if (hp <= 0) { best.kill(D, { vel: D.clone().multiplyScalar(3).add(new THREE.Vector3(0, 2.5, 0)) }); this.punchHp.delete(key); this.fighters = (this.fighters || []).filter((f) => f.key !== key); }
+    else if (!(this.fighters ||= []).some((f) => f.key === key)) this.fighters.push({ key, t: best, next: G.time + 0.7 + Math.random() * 0.4 }); // brání se
+    else if (best.mesh.isObject3D) { best.mesh.position.x += fx * 0.35; best.mesh.position.z += fz * 0.35; } // zavrávorá
+    for (const p of G.peds) if (p.mesh === best.mesh) { p.state = 'flee'; p.timer = 8; p.x += fx * 0.35; p.z += fz * 0.35; }
+    if (hp === 2 && G.police.some((c) => Math.hypot(c.veh.x - P.x, c.veh.z - P.z) < 90)) G.addWanted(1);
+    if (hp <= 0) G.addWanted(1);
+  }
+
+  /** Kdo dostal ránu, brání se: jde k hráči a vrací rány (slabší a pomalejší než hráč). */
+  updateFighters(dt) {
+    const G = this.game, P = G.player;
+    if (!this.fighters?.length) return;
+    for (let i = this.fighters.length - 1; i >= 0; i--) {
+      const f = this.fighters[i], t = f.t;
+      const alive = t.crowd ? t.crowd.vis[t.ci] && !t.crowd.dead[t.ci] : (t.mesh.visible !== false && !G.weapons.corpses.some((c) => c.mesh === t.mesh));
+      const q = t.crowd ? { x: t.crowd.x[t.ci], y: t.crowd.y[t.ci], z: t.crowd.z[t.ci] } : t.mesh.position;
+      const dx = P.x - q.x, dz = P.z - q.z, d = Math.hypot(dx, dz);
+      if (!alive || d > 9 || G.mode !== 'foot' || P.hp <= 0) { this.fighters.splice(i, 1); continue; }
+      const h = Math.atan2(dx, dz);
+      if (t.crowd) t.crowd.h[t.ci] = h;
+      else {
+        t.mesh.rotation.y = h;
+        if (d > 1.3) { const s = Math.min(d - 1.2, 3.2 * dt); t.mesh.position.x += (dx / d) * s; t.mesh.position.z += (dz / d) * s; } // jde po hráči
+        const ped = G.peds.find((p) => p.mesh === t.mesh); if (ped) { ped.x = t.mesh.position.x; ped.z = t.mesh.position.z; ped.state = 'fight'; ped.timer = 3; }
+      }
+      if (d < 1.8 && G.time >= f.next) {
+        f.next = G.time + 1.1 + Math.random() * 0.5;
+        if (!t.crowd) { t.mesh.userData.punchNew = true; t.mesh.userData.punchT = 0.45; }
+        if (Math.random() < 0.75) { // zásah
+          G.hurt(5 + Math.round(Math.random() * 4), 'rvačka');
+          this.bleed(new THREE.Vector3(P.x, P.y + 1.55, P.z), new THREE.Vector3(-dx / (d || 1), 0, -dz / (d || 1)), 3);
+          G.audio?.noise?.(0.08, 0.6, 360);
+          this.shake = Math.max(this.shake, 0.12);
+        } else G.audio?.noise?.(0.06, 0.18, 1600); // vedle
+      }
+    }
+  }
+
   /** Bazuka: raketa letí tam, kam míří kamera. */
   fireBazooka() {
     const G = this.game, cam = G.camera, D = new THREE.Vector3();
@@ -825,13 +889,15 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       this.slot = pick;
       G.audio?.blip?.(500 + pick * 60, 0.05, 'square', 0.04);
       const w = WEAPONS[pick];
-      G.toast?.(w ? `${w.icon} ${w.name}` : 'Zbraň schovaná');
+      G.toast?.(w ? `${w.icon} ${w.name}` : '👊 Pěsti – myš / F = rána');
       this.updateHud();
     }
     const onFoot = G.mode === 'foot' && G.player.hp > 0;
     this.gunMeshes.forEach((m, k) => { if (m) m.visible = onFoot && k === this.slot; });
     this.cool -= dt;
     const w = WEAPONS[this.slot];
+    // pěsti (bez zbraně): myš / F / K = rána
+    if (onFoot && !w && (inp.hit('Mouse0') || inp.hit('KeyF') || inp.hit('KeyK')) && this.cool <= 0) { this.cool = 0.42; this.punch(); }
     if (onFoot && w) {
       // hráč míří tam, kam kamera
       G.player.h = G.camYaw;
@@ -851,6 +917,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.updateCasings(dt);
     this.updateGrenades(dt);
     this.updateBurning(dt);
+    this.updateFighters(dt);
     this.updateRockets(dt);
     this.updateDebris(dt);
     this.updateFx(dt);

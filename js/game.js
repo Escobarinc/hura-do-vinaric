@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127135633';
-import { PrisonLife } from './prison.js?v=20261127135633';
-import { Weapons } from './weapons.js?v=20261127135633';
-import { PrisonFX } from './prisonfx.js?v=20261127135633';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127135633';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127140320';
+import { PrisonLife } from './prison.js?v=20261127140320';
+import { Weapons } from './weapons.js?v=20261127140320';
+import { PrisonFX } from './prisonfx.js?v=20261127140320';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127140320';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -435,7 +435,8 @@ export class Game {
     m.visible = true;
     m.position.set(P.x, P.y, P.z);
     m.rotation.y = P.h;
-    animateHuman(m, sp, dt, P.y > floor + 0.25 ? 'air' : null);
+    this.punchT = Math.max(0, (this.punchT || 0) - dt);
+    animateHuman(m, sp, dt, P.y > floor + 0.25 ? 'air' : this.punchT > 0 ? 'punch' : null);
     this.hud.setSpeed(null);
   }
 
@@ -916,6 +917,14 @@ export class Game {
         if (m.userData.kit) { animateHuman(m, 0, dt, 'down'); m.position.set(p.x, gy, p.z); }
         else { m.rotation.x = lerp(m.rotation.x, -Math.PI / 2, Math.min(1, dt * 10)); m.position.set(p.x, gy + 0.2, p.z); }
         if (p.timer <= 0) { p.state = 'flee'; p.timer = 5; m.rotation.x = 0; }
+        continue;
+      }
+      if (p.state === 'fight') { // rvačka s hráčem (pozici a směr řídí weapons.updateFighters)
+        p.timer -= dt;
+        const u = m.userData; u.punchT = Math.max(0, (u.punchT || 0) - dt);
+        m.position.set(p.x, this.city.surface(p.x, p.z, m.position.y + 0.6), p.z);
+        animateHuman(m, 0, dt, u.punchT > 0 ? 'punch' : null);
+        if (p.timer <= 0) { p.state = 'flee'; p.timer = 5; }
         continue;
       }
       let sp = p.speed;

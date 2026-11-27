@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127135633';
-import { labelTexture } from './textures.js?v=20261127135633';
-import { Crowd } from './crowd.js?v=20261127135633';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127140320';
+import { labelTexture } from './textures.js?v=20261127140320';
+import { Crowd } from './crowd.js?v=20261127140320';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -482,7 +482,8 @@ export class PrisonLife {
       for (let i = 0; i < C.cap; i++) {
         if (!C.vis[i] || C.dead[i]) continue;
         const pos = { x: C.x[i], y: C.y[i], z: C.z[i] };
-        out.push({ mesh: { position: pos }, kill: (dir, boom) => {
+        C._uid ||= Math.random().toString(36).slice(2);
+        out.push({ key: `${C._uid}:${i}`, crowd: C, ci: i, mesh: { position: pos }, kill: (dir, boom) => {
           C.kill(i, dir, boom?.vel || null);
           if (C === this.riotCrowd && this.riot) this.riot.rs[i] = 4;
           this.onCrowdKill?.(C, i);

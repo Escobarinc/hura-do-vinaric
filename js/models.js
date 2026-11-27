@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import * as SkeletonUtils from 'three/addons/utils/SkeletonUtils.js';
-import { pick } from './util.js?v=20261127135633';
+import { pick } from './util.js?v=20261127140320';
 
 export const KIT = { cars: {}, chars: [], ready: false };
 
@@ -300,6 +300,8 @@ export function animateKitHuman(h, speed, dt, mode) {
   const u = h.userData;
   if (mode === 'down') {
     play(u, 'Death', 0.12);
+  } else if (mode === 'punch') {
+    if (u.punchNew) { u.punchNew = false; const a = play(u, 'Punch', 0.06, true); if (a) a.timeScale = 1.6; }
   } else if (mode === 'air') {
     play(u, 'Jump', 0.1);
   } else if (speed > 5.2) {
