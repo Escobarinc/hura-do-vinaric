@@ -234,3 +234,10 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
   20%, 24%, 55% { opacity: .55; text-shadow: 0 0 2px #fff, 0 0 6px #39ff14 !important; }
 }
 @media (prefers-reduced-motion: reduce) { .logo b { animation: none; } }
+/* nápis rovně, oba řádky svítí neonově zeleně */
+.logo { transform: none !important; }
+.logo span { color: #f2fff0 !important; text-shadow: 0 0 3px #fff, 0 0 9px #39ff14, 0 0 20px #39ff14, 0 0 38px rgba(57,255,20,.7) !important; }
+.logo b { color: #d9ffcc !important; }
+.logo { animation: neon-hum 3.2s ease-in-out infinite; }
+@keyframes neon-hum { 0%, 100% { filter: brightness(1); } 50% { filter: brightness(1.18); } }
+@media (prefers-reduced-motion: reduce) { .logo { animation: none; } }
