@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127144217';
-import { labelTexture } from './textures.js?v=20261127144217';
-import { Crowd } from './crowd.js?v=20261127144217';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127144806';
+import { labelTexture } from './textures.js?v=20261127144806';
+import { Crowd } from './crowd.js?v=20261127144806';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1239,10 +1239,8 @@ export class PrisonLife {
     add('🚌 Eskortní autobusy', () => { this.goToPrison(); this.startEscort(2, 35); this.game.prisonFx?.announce('Pozor, přijíždí eskorta. Uvolněte vjezd.'); });
     add('🚒 Hasičský zásah', () => { this.goToPrison(); this.startFire(); });
     add('🚨 Policejní zásah', () => this.startRiot());
-    add('🥊 MMA zápas', () => { this.goToPrison(); this.game.mma.start('watch'); });
-    add('🥊 MMA – hraj za vězně', () => { this.goToPrison(); this.game.mma.start('play'); });
-    add('🥊 MMA 3 na 3', () => { this.goToPrison(); this.game.mma.start('team'); });
-    add('🥊 3 na 3 – hraj', () => { this.goToPrison(); this.game.mma.start('teamPlay'); });
+    add('🥊 MMA zápas', () => this.openMmaPicker(false));
+    add('🥊 MMA – hraj za vězně', () => { const M = this.game.mma; if (M.active) M.takeOver(); else this.openMmaPicker(true); });
     add('🔄 Restart', () => this.resetAll());
     add('📍 Teleport (T)', () => this.game.hud.openTeleport(this.game));
     add('🧭 Navigace (N)', () => this.game.hud.openNav(this.game));
@@ -1281,6 +1279,22 @@ export class PrisonLife {
     if (Math.hypot(F.x - CENTER.x, F.z - CENTER.z) < ACTIVE_R - 40) return;
     const l = this.game.landmarks.find((q) => q.prisonInside);
     if (l) this.game.teleport(l);
+  }
+  /** Výběr MMA zápasu: 1 na 1 nebo 3 na 3 (play = hned hraješ za vězně). */
+  openMmaPicker(play) {
+    document.getElementById('meal-pick')?.remove();
+    const box = document.createElement('div');
+    box.id = 'meal-pick';
+    box.innerHTML = `<h3>🥊 ${play ? 'Hraj za vězně' : 'Večerní MMA zápas'}</h3><p style="margin:0 0 8px;font-size:12.5px;opacity:.75">${play ? 'Vyber zápas, ve kterém budeš vězeň.' : 'Bachaři proti vězňům. Za vězně můžeš kdykoli naskočit tlačítkem „MMA – hraj za vězně“.'}</p>`
+      + '<div class="row"><button data-a="1" class="go">1 na 1</button><button data-a="3" class="go">3 na 3</button><button data-a="x">✕</button></div>';
+    (document.getElementById('hud') || document.body).appendChild(box);
+    if (document.pointerLockElement) document.exitPointerLock();
+    box.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const a = e.target.dataset?.a;
+      if (a === 'x') box.remove();
+      if (a === '1' || a === '3') { box.remove(); this.goToPrison(); this.game.mma.start(a === '3' ? (play ? 'teamPlay' : 'team') : (play ? 'play' : 'watch')); }
+    });
   }
   /** Tlačítko oběd / večeře: nejdřív výběr budov, které půjdou. */
   startMeal(i) { this.openMealPicker(i); }
