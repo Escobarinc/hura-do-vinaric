@@ -76,6 +76,8 @@ export class Weapons {
     this.corpses = [];
     this.burning = []; // hořící vraky
     this.rockets = []; // rakety z bazuky a tanku
+    this.debris = []; // trosky zdí, plotů a budov
+    this.holes = []; // díry v budovách
     this.queueBoom = []; // výbuchy zničených vozidel (až v dalším snímku, ať se neřetězí v jednom průchodu)
     this.grenades = [];
     this.fx = [];
@@ -217,7 +219,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     if (v.hp > 0) return;
     this.wreck(v);
   }
-  wreck(v) {
+  wreck(v, boom = true) {
     if (v.burnT != null) return;
     v.dead = true; v.hp = 0; v.burnT = 0;
     // ohořelý lak
@@ -232,7 +234,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       this.scene.add(sp); v.flames.push(sp);
     }
     this.burning.push(v);
-    this.queueBoom.push(new THREE.Vector3(v.x, v.y + 1, v.z));
+    if (boom) this.queueBoom.push(new THREE.Vector3(v.x, v.y + 1, v.z));
   }
   updateBurning(dt) {
     for (const p of this.queueBoom.splice(0)) this.explode(p, true);
@@ -291,6 +293,122 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       this.shake = Math.max(this.shake, 0.08 * Math.min(4, n));
       v.v *= Math.max(0.75, 1 - 0.03 * n); // každé tělo trochu přibrzdí
       if (v === G.vehicle) G.addWanted(n > 2 ? 2 : 1);
+    }
+  }
+
+  /* ---------- ničení zdí, plotů a budov ---------- */
+  /** Rozbije kus zdi / plotu: zmizí geometrie i kolize, odletí trosky. dir = směr nárazu. */
+  breakPiece(pc, dx = 0, dz = 0) {
+    if (pc.broken) return;
+    pc.broken = true;
+    for (const f of pc.f) f.off = true;
+    for (const r of pc.ranges) {
+      const a = r.mesh.geometry.attributes.position;
+      for (let i = r.start; i < r.start + r.count; i++) a.setY(i, -500);
+      a.needsUpdate = true;
+    }
+    const city = this.game.city, y = city.ground(pc.cx, pc.cz), wall = pc.kind === 'wall';
+    this.debrisGeo ||= new THREE.BoxGeometry(1, 1, 1);
+    this.debrisM ||= { wall: new THREE.MeshStandardMaterial({ color: '#cfcbc2', roughness: 0.95 }), fence: new THREE.MeshStandardMaterial({ color: '#9aa0a4', metalness: 0.6, roughness: 0.45 }) };
+    const n = wall ? 7 : 3;
+    for (let k = 0; k < n; k++) {
+      const m = new THREE.Mesh(this.debrisGeo, this.debrisM[pc.kind]);
+      const sz = wall ? 0.35 + Math.random() * 0.7 : 0.08;
+      m.scale.set(wall ? sz : 1.4, wall ? sz * 0.7 : 1.2 + Math.random(), wall ? sz : sz);
+      m.position.set(pc.cx + (Math.random() - 0.5) * 1.2, y + Math.random() * (wall ? 3 : 1.5), pc.cz + (Math.random() - 0.5) * 1.2);
+      m.castShadow = true;
+      this.scene.add(m);
+      this.debris.push({ m, v: new THREE.Vector3(dx * (2 + Math.random() * 4) + (Math.random() - 0.5) * 3, 2 + Math.random() * 4, dz * (2 + Math.random() * 4) + (Math.random() - 0.5) * 3), spin: (Math.random() - 0.5) * 8, t: 0, half: (wall ? m.scale.y : 0.05) / 2 });
+    }
+    if (this.debris.length > 260) for (const d of this.debris.splice(0, this.debris.length - 260)) this.scene.remove(d.m);
+    for (let k = 0; k < (wall ? 26 : 8); k++) this.dust.emit(pc.cx, y + Math.random() * 3, pc.cz, (Math.random() - 0.5) * 4, Math.random() * 3, (Math.random() - 0.5) * 4, 1.6, 4);
+    const now = performance.now();
+    if (now - (this.breakSnd || 0) > 90) { this.breakSnd = now; this.game.audio?.noise?.(wall ? 0.5 : 0.25, wall ? 0.7 : 0.4, wall ? 220 : 1400); }
+  }
+  /** Výbuch rozbije zdi a ploty v okruhu r. */
+  breakNear(x, z, r) {
+    for (const pc of this.game.city.breakables || []) {
+      if (pc.broken || Math.abs(pc.cx - x) > r + 2 || Math.abs(pc.cz - z) > r + 2) continue;
+      const d = Math.hypot(pc.cx - x, pc.cz - z);
+      if (d < (pc.kind === 'wall' ? r * 0.6 : r)) this.breakPiece(pc, (pc.cx - x) / (d || 1), (pc.cz - z) / (d || 1));
+    }
+  }
+  /** Tank (nebo rychlé auto u plotu) prorazí, co má před sebou. */
+  ramBreak(v, walls, push = null) {
+    const sp = Math.hypot(v.vx || 0, v.vz || 0);
+    if (push == null && sp < 1.2) return;
+    const fx = Math.sin(v.h), fz = Math.cos(v.h), dir = push ?? Math.sign(v.v || 1);
+    const px = v.x + fx * dir * (v.L / 2 + 0.4), pz = v.z + fz * dir * (v.L / 2 + 0.4), R = v.W / 2 + 0.9;
+    for (const pc of this.game.city.breakables || []) {
+      if (pc.broken || (!walls && pc.kind === 'wall') || Math.abs(pc.cx - px) > R + 2 || Math.abs(pc.cz - pz) > R + 2) continue;
+      // vzdálenost od úseku kusu
+      const ex = pc.x1 - pc.x0, ez = pc.z1 - pc.z0, l2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, ((px - pc.x0) * ex + (pz - pc.z0) * ez) / l2));
+      if (Math.hypot(pc.x0 + ex * t - px, pc.z0 + ez * t - pz) < R) this.breakPiece(pc, fx * dir, fz * dir);
+    }
+  }
+  /** Tank přejede auto: zmačká ho (zploštělý vrak). */
+  crushCars(v) {
+    if (Math.hypot(v.vx || 0, v.vz || 0) < 1) return;
+    for (const o of this.game.allVehicles()) {
+      if (o === v || o.crushed || o.kind === 'heli' || !o.mesh?.visible) continue;
+      if (Math.hypot(o.x - v.x, o.z - v.z) > (v.L + o.L) * 0.42) continue;
+      o.crushed = true;
+      if (o.burnT == null) this.wreck(o, false);
+      o.mesh.scale.y = 0.38; o.v = o.vx = o.vz = 0;
+      this.game.audio?.crash?.(30);
+      this.shake = Math.max(this.shake, 0.35);
+    }
+  }
+  updateDebris(dt) {
+    const city = this.game.city;
+    for (let i = this.debris.length - 1; i >= 0; i--) {
+      const d = this.debris[i];
+      d.t += dt;
+      if (d.rest) continue;
+      d.v.y -= 9.8 * dt;
+      d.m.position.addScaledVector(d.v, dt);
+      d.m.rotation.x += d.spin * dt; d.m.rotation.z += d.spin * 0.7 * dt;
+      const gy = city.ground(d.m.position.x, d.m.position.z) + d.half;
+      if (d.m.position.y < gy) { d.m.position.y = gy; d.v.multiplyScalar(0.35); d.v.y = Math.abs(d.v.y) * 0.3; if (d.v.length() < 0.6) { d.rest = true; d.m.rotation.x = Math.round(d.m.rotation.x / (Math.PI / 2)) * (Math.PI / 2); } }
+    }
+  }
+  /** Díra do budovy po zásahu raketou: tmavý otvor s otlučeným okrajem na stěně, trosky a prach. */
+  holeInBuilding(p, b) {
+    // nejbližší stěna → normála ven
+    const q = b.p;
+    let bd = 1e9, nx = 0, nz = 0;
+    for (let i = 0, j = q.length - 2; i < q.length; j = i, i += 2) {
+      const ax = q[j], az = q[j + 1], ex = q[i] - ax, ez = q[i + 1] - az, l2 = ex * ex + ez * ez || 1;
+      const t = Math.max(0, Math.min(1, ((p.x - ax) * ex + (p.z - az) * ez) / l2));
+      const cx = ax + ex * t, cz = az + ez * t, d = Math.hypot(p.x - cx, p.z - cz);
+      if (d < bd) { bd = d; const l = Math.sqrt(l2); nx = ez / l; nz = -ex / l; }
+    }
+    // normála musí mířit ven z budovy
+    const cxB = b.cx, czB = b.cz;
+    if ((p.x - cxB) * nx + (p.z - czB) * nz < 0) { nx = -nx; nz = -nz; }
+    if (!this.holeT) {
+      const c = document.createElement('canvas'); c.width = c.height = 256;
+      const g = c.getContext('2d');
+      const ring = (r0, col) => { g.fillStyle = col; g.beginPath(); for (let k = 0; k <= 28; k++) { const a = (k / 28) * Math.PI * 2, r = r0 * (0.75 + Math.random() * 0.35); g.lineTo(128 + Math.cos(a) * r, 128 + Math.sin(a) * r); } g.closePath(); g.fill(); };
+      ring(122, 'rgba(70,64,58,0.55)'); ring(104, '#9a8f84'); ring(88, '#5e554d'); ring(72, '#1d1a18'); ring(52, '#0a0909');
+      for (let k = 0; k < 60; k++) { g.fillStyle = `rgba(30,26,22,${Math.random() * 0.5})`; g.fillRect(128 + (Math.random() - 0.5) * 230, 128 + (Math.random() - 0.5) * 230, 4, 4); }
+      this.holeT = new THREE.CanvasTexture(c); this.holeT.colorSpace = THREE.SRGBColorSpace;
+    }
+    const sz = 2.2 + Math.random() * 1.2;
+    const m = new THREE.Mesh(new THREE.PlaneGeometry(sz, sz), new THREE.MeshStandardMaterial({ map: this.holeT, transparent: true, depthWrite: false, roughness: 1, polygonOffset: true, polygonOffsetFactor: -4 }));
+    const y = Math.min(Math.max(p.y, b.g + sz / 2), b.h - 0.5);
+    m.position.set(p.x + nx * 0.06, y, p.z + nz * 0.06);
+    m.rotation.set(0, Math.atan2(nx, nz), Math.random() * 6);
+    this.scene.add(m);
+    this.holes.push(m);
+    if (this.holes.length > 160) this.scene.remove(this.holes.shift());
+    // trosky z díry
+    this.debrisGeo ||= new THREE.BoxGeometry(1, 1, 1);
+    this.holeDebM ||= new THREE.MeshStandardMaterial({ color: '#b9b2a6', roughness: 0.95 });
+    for (let k = 0; k < 6; k++) {
+      const d = new THREE.Mesh(this.debrisGeo, this.holeDebM); const s2 = 0.2 + Math.random() * 0.4; d.scale.set(s2, s2 * 0.7, s2);
+      d.position.set(p.x + nx * 0.5, y, p.z + nz * 0.5); d.castShadow = true; this.scene.add(d);
+      this.debris.push({ m: d, v: new THREE.Vector3(nx * (2 + Math.random() * 4) + (Math.random() - 0.5) * 2, 1 + Math.random() * 3, nz * (2 + Math.random() * 4) + (Math.random() - 0.5) * 2), spin: (Math.random() - 0.5) * 8, t: 0, half: s2 * 0.35 });
     }
   }
 
@@ -473,6 +591,18 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.grenades.push({ mesh, vel, t: 0 });
     G.audio?.blip?.(300, 0.08, 'triangle', 0.08, -120);
   }
+  /** Kanón stíhačky: rychlá dávka po směru letu (trasovací střely). */
+  jetBurst(O, D) {
+    const D2 = D.clone().add(new THREE.Vector3((Math.random() - 0.5) * 0.012, (Math.random() - 0.5) * 0.012, (Math.random() - 0.5) * 0.012)).normalize();
+    const hit = this.cast(O, D2, 420);
+    this.tracer(O, hit.p);
+    if (hit.vehicle) this.hurtVehicle(hit.vehicle, 14, hit.p);
+    else if (hit.target) { this.bleed(hit.p, D2, 16); hit.target.kill(D2, false); this.game.addWanted(1); }
+    else { for (let i = 0; i < 5; i++) this.dust.emit(hit.p.x, hit.p.y, hit.p.z, (Math.random() - 0.5) * 3, Math.random() * 3, (Math.random() - 0.5) * 3, 0.7, 6); for (let i = 0; i < 3; i++) this.sparks.emit(hit.p.x, hit.p.y, hit.p.z, (Math.random() - 0.5) * 5, Math.random() * 4, (Math.random() - 0.5) * 5, 0.25, 9); }
+    const now = performance.now();
+    if (now - (this.jetSnd || 0) > 40) { this.jetSnd = now; this.game.audio?.noise?.(0.06, 0.45, 2600); }
+  }
+
   /** Bazuka: raketa letí tam, kam míří kamera. */
   fireBazooka() {
     const G = this.game, cam = G.camera, D = new THREE.Vector3();
@@ -513,6 +643,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       if (boom) {
         this.scene.remove(m); this.rockets.splice(i, 1);
         if (hit.vehicle) this.wreck(hit.vehicle);
+        if (hit.wall) { const b = city.buildingAt(boom.x - r.D.x * 0.3, boom.z - r.D.z * 0.3) || city.buildingAt(boom.x + r.D.x * 0.5, boom.z + r.D.z * 0.5); if (b) this.holeInBuilding(boom, b); }
         this.explode(boom, r.npc);
         continue;
       }
@@ -602,6 +733,8 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       }
     }
     for (const q of G.peds) if (q.state !== 'dead' && Math.hypot(q.x - p.x, q.z - p.z) < 60) { q.state = 'flee'; q.timer = 10; }
+    // zdi a ploty v okolí
+    this.breakNear(p.x, p.z, 4.5);
     // vozidla odhodí a poškodí
     for (const v of G.allVehicles()) {
       const dx = v.x - p.x, dz = v.z - p.z, d = Math.hypot(dx, dz) || 0.1;
@@ -651,6 +784,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     // Q / kolečko myši: další zbraň dokola (0 → 1 → … → bazuka → 0)
     if (inp.hit('KeyQ')) pick = (this.slot + 1) % NW;
     if (inp.wheel) { pick = (this.slot + (inp.wheel > 0 ? 1 : NW - 1)) % NW; inp.wheel = 0; }
+    if (G.mode !== 'foot') pick = null; // v autě / stíhačce čísla patří vozidlu
     if (pick !== null && pick !== this.slot) {
       this.slot = pick;
       G.audio?.blip?.(500 + pick * 60, 0.05, 'square', 0.04);
@@ -682,6 +816,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.updateGrenades(dt);
     this.updateBurning(dt);
     this.updateRockets(dt);
+    this.updateDebris(dt);
     this.updateFx(dt);
     this.shake = Math.max(0, this.shake - dt * 1.8);
     this.hudT = (this.hudT || 0) - dt;
@@ -694,6 +829,10 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.burning.length = 0; this.queueBoom.length = 0;
     for (const r of this.rockets) this.scene.remove(r.mesh);
     this.rockets.length = 0;
+    for (const d of this.debris) this.scene.remove(d.m);
+    this.debris.length = 0;
+    for (const h of this.holes) this.scene.remove(h);
+    this.holes.length = 0;
     for (const c of this.corpses) {
       if (c.poolPerson) { c.poolPerson.dead = false; c.poolPerson.used = false; c.mesh.visible = false; c.mesh.rotation.set(0, 0, 0); }
       else this.scene.remove(c.mesh);

@@ -1,4 +1,4 @@
-import { fmtMoney } from './util.js?v=20261127133511';
+import { fmtMoney } from './util.js?v=20261127134447';
 
 const $ = (id) => document.getElementById(id);
 const MAP_SCALE = 0.5; // px na metr v předrenderované mapě
@@ -84,7 +84,7 @@ export class Hud {
         foot: [['Skok', 'Mezerník'], ['Sprint', 'Shift'], ['Navigace', 'N'], ['Přetočit čas', 'P']],
         car: [['Ruční brzda', 'Mezerník'], ['Houkačka', 'H'], ['Navigace', 'N']],
         heli: [['Stoupat', 'Mezerník'], ['Klesat', 'Shift'], ['Otáčení', 'A / D']],
-        jet: [['Plyn', 'W'], ['Stoupat', 'Mezerník'], ['Klesat', 'Shift'], ['Zatáčení', 'A / D']],
+        jet: [['Plyn', 'W'], ['Stoupat', 'Mezerník'], ['Klesat', 'Shift'], ['Kanón / rakety', '1 / 2'], ['Palba', 'F / myš']],
         trolley: [['Vystoupit v zastávce', 'E']],
       }[m] || [];
       e.keys.innerHTML = k.map(([a, b]) => `<div>${a} <kbd>${b}</kbd></div>`).join('');

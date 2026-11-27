@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { hash01, pointInPoly, nextFrame } from './util.js?v=20261127133511';
-import { K_PEN } from './data.js?v=20261127133511';
-import * as TX from './textures.js?v=20261127133511';
+import { hash01, pointInPoly, nextFrame } from './util.js?v=20261127134447';
+import { K_PEN } from './data.js?v=20261127134447';
+import * as TX from './textures.js?v=20261127134447';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* --------- pomocný buffer geometrie --------- */
@@ -1295,31 +1295,38 @@ function buildPrison(city, G, world) {
   const gateMid = [PRISON.gate.b[0], PRISON.gate.b[1]];
   const inOpening = (x, z) => PRISON.openings.some(([ox, oz, r]) => Math.hypot(x - ox, z - oz) < r);
 
+  // ---------- rozbitelné kusy zdí a plotů (tank, výbuchy): každý kus = id, jeho geometrie nesou userData.dz ----------
+  const brk = (city.breakables ||= []);
+  const tag = (list, id) => { list[list.length - 1].userData.dz = id; };
+  const newPiece = (kind, x0, z0, x1, z1, H) => { const o = { id: brk.length, kind, x0, z0, x1, z1, cx: (x0 + x1) / 2, cz: (z0 + z1) / 2, H, f: [], ranges: [], broken: false }; brk.push(o); return o; };
   // ---------- betonové zdi (5 m) se žiletkovým drátem ----------
   const wall = (pts, H) => {
     pieces(pts, 1.5, (x0, z0, x1, z1, rot) => {
+      const pc = newPiece('wall', x0, z0, x1, z1, H), id = pc.id;
       const g0 = G(x0, z0), g1 = G(x1, z1), lo = Math.min(g0, g1) - 0.8, top = Math.max(g0, g1) + H;
       const L = Math.hypot(x1 - x0, z1 - z0) + 0.04;
-      boxAt(geos.wall, 0.32, top - lo, L, (x0 + x1) / 2, (top + lo) / 2, (z0 + z1) / 2, rot);
-      boxAt(geos.cap, 0.5, 0.18, L, (x0 + x1) / 2, top + 0.09, (z0 + z1) / 2, rot);
+      boxAt(geos.wall, 0.32, top - lo, L, (x0 + x1) / 2, (top + lo) / 2, (z0 + z1) / 2, rot); tag(geos.wall, id);
+      boxAt(geos.cap, 0.5, 0.18, L, (x0 + x1) / 2, top + 0.09, (z0 + z1) / 2, rot); tag(geos.cap, id);
       // drát v rozích (konzole do Y a válec drátu)
       const wg = new THREE.CylinderGeometry(0.38, 0.38, L, 10, 1, true);
       wg.rotateX(Math.PI / 2);
       wg.applyMatrix4(new THREE.Matrix4().compose(V((x0 + x1) / 2, top + 0.55, (z0 + z1) / 2), new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), rot), V(1, 1, 1)));
-      geos.wire.push(wg);
-      geos.dark.push(beamGeo(V(x0, top, z0), V(x0, top + 0.95, z0), 0.06));
-      city.addFence(x0, z0, x1, z1, H + 0.9, 0.35);
+      geos.wire.push(wg); tag(geos.wire, id);
+      geos.dark.push(beamGeo(V(x0, top, z0), V(x0, top + 0.95, z0), 0.06)); tag(geos.dark, id);
+      pc.f.push(city.addFence(x0, z0, x1, z1, H + 0.9, 0.35));
     }, inOpening);
   };
   // ---------- ploty z pletiva se sloupky a drátem nahoře ----------
   const fenceMeshes = [];
   const fence = (pts, H, gap = null) => {
-    const pos = [], uv = [];
+    const pos = [], uv = [], dzList = [];
     pieces(pts, 3, (x0, z0, x1, z1) => {
+      const pc = newPiece('fence', x0, z0, x1, z1, H), id = pc.id;
       const g0 = G(x0, z0), g1 = G(x1, z1), L = Math.hypot(x1 - x0, z1 - z0);
       pos.push(x0, g0, z0, x1, g1, z1, x1, g1 + H, z1, x0, g0, z0, x1, g1 + H, z1, x0, g0 + H, z0);
       uv.push(0, 0, L / 1.2, 0, L / 1.2, H / 1.2, 0, 0, L / 1.2, H / 1.2, 0, H / 1.2);
-      geos.steel.push(beamGeo(V(x0, g0 - 0.3, z0), V(x0, g0 + H + 0.45, z0), 0.09));
+      dzList.push(id);
+      geos.steel.push(beamGeo(V(x0, g0 - 0.3, z0), V(x0, g0 + H + 0.45, z0), 0.09)); tag(geos.steel, id);
       // šikmá konzole a drát nahoře
       geos.wire.push((() => {
         const wg = new THREE.CylinderGeometry(0.3, 0.3, L, 8, 1, true);
@@ -1327,25 +1334,23 @@ function buildPrison(city, G, world) {
         wg.applyMatrix4(new THREE.Matrix4().compose(V((x0 + x1) / 2, (g0 + g1) / 2 + H + 0.35, (z0 + z1) / 2),
           new THREE.Quaternion().setFromAxisAngle(V(0, 1, 0), Math.atan2(x1 - x0, z1 - z0)), V(1, 1, 1)));
         return wg;
-      })());
+      })()); tag(geos.wire, id);
+      // kolize po kusech (kus jde rozbít)
+      const n = Math.max(1, Math.round(L / 1.5));
+      for (let k = 0; k < n; k++) {
+        const ax = x0 + ((x1 - x0) * k) / n, az = z0 + ((z1 - z0) * k) / n, bx = x0 + ((x1 - x0) * (k + 1)) / n, bz = z0 + ((z1 - z0) * (k + 1)) / n;
+        pc.f.push(city.addFence(ax, az, bx, bz, H + 0.6, 0.2));
+      }
     }, gap);
     if (!pos.length) return;
     const geo = new THREE.BufferGeometry();
     geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
     geo.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
     geo.computeVertexNormals();
+    geo.userData.dzList = dzList; // 6 vrcholů na kus
     fenceMeshes.push(geo);
-    for (let i = 0; i + 1 < pts.length; i++) {
-      const [ax, az] = pts[i], [bx, bz] = pts[i + 1];
-      if (!gap) { city.addFence(ax, az, bx, bz, H + 0.6, 0.2); continue; }
-      // kolizní úseky mimo mezeru brány
-      const L = Math.hypot(bx - ax, bz - az), n = Math.max(1, Math.round(L / 1.5));
-      for (let k = 0; k < n; k++) {
-        const x0 = ax + ((bx - ax) * k) / n, z0 = az + ((bz - az) * k) / n, x1 = ax + ((bx - ax) * (k + 1)) / n, z1 = az + ((bz - az) * (k + 1)) / n;
-        if (!gap((x0 + x1) / 2, (z0 + z1) / 2)) city.addFence(x0, z0, x1, z1, H + 0.6, 0.2);
-      }
-    }
   };
+
 
   for (const w of PRISON.walls) wall(w, 5);
   for (const w of PRISON.innerWalls) wall(w, 5);
@@ -1634,9 +1639,14 @@ function buildPrison(city, G, world) {
   // sloučení do pár meshů
   const add = (list, mat) => {
     if (!list.length) return;
-    const m = new THREE.Mesh(mergeGeometries(list.map((q) => (q.index ? q.toNonIndexed() : q)).map((q) => { for (const k of Object.keys(q.attributes)) if (!['position', 'normal', 'uv'].includes(k)) q.deleteAttribute(k); return q; })), mat);
+    const tags = list.map((q) => q.userData.dz);
+    const flat = list.map((q) => (q.index ? q.toNonIndexed() : q)).map((q) => { for (const k of Object.keys(q.attributes)) if (!['position', 'normal', 'uv'].includes(k)) q.deleteAttribute(k); return q; });
+    const m = new THREE.Mesh(mergeGeometries(flat), mat);
     m.castShadow = m.receiveShadow = true;
     g.add(m);
+    // rozsahy vrcholů rozbitelných kusů v sloučené geometrii
+    let off = 0;
+    flat.forEach((q, i) => { const n = q.attributes.position.count; if (tags[i] != null) brk[tags[i]].ranges.push({ mesh: m, start: off, count: n }); off += n; });
   };
   add(geos.wall, wallM); add(geos.cap, capM); add(geos.steel, steel); add(geos.dark, darkSteel); add(geos.concrete, concrete); add(geos.lamp, lampM);
   add(geos.wire, wireM);
@@ -1644,6 +1654,8 @@ function buildPrison(city, G, world) {
     const fm = new THREE.Mesh(mergeGeometries(fenceMeshes), new THREE.MeshStandardMaterial({ map: meshT, alphaTest: 0.35, side: THREE.DoubleSide, metalness: 0.5, roughness: 0.5 }));
     fm.castShadow = true;
     g.add(fm);
+    let off = 0;
+    for (const q of fenceMeshes) { for (const id of q.userData.dzList || []) { brk[id].ranges.push({ mesh: fm, start: off, count: 6 }); off += 6; } if (!q.userData.dzList) off += q.attributes.position.count; }
   }
   return g;
 }

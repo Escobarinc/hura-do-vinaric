@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127133511';
-import { PrisonLife } from './prison.js?v=20261127133511';
-import { Weapons } from './weapons.js?v=20261127133511';
-import { PrisonFX } from './prisonfx.js?v=20261127133511';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127133511';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127134447';
+import { PrisonLife } from './prison.js?v=20261127134447';
+import { Weapons } from './weapons.js?v=20261127134447';
+import { PrisonFX } from './prisonfx.js?v=20261127134447';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127134447';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -520,7 +520,7 @@ export class Game {
       }
       if (this.jet && Math.hypot(this.jet.x - P.x, this.jet.z - P.z) < 8 && Math.abs(this.jet.y - P.y) < 3) {
         this.enter(this.jet, 'jet');
-        this.toast('Stíhačka: W plyn · S brzda · A/D zatáčení · mezerník stoupat · Shift klesat');
+        this.toast('Stíhačka: W plyn · A/D zatáčení · mezerník/Shift výška · 1 kanón · 2 rakety · F nebo myš = palba');
         return;
       }
       if (this.heli && Math.hypot(this.heli.x - P.x, this.heli.z - P.z) < 7 && Math.abs(this.heli.y - P.y) < 3) {
@@ -594,9 +594,12 @@ export class Game {
   updateCar(dt) {
     const v = this.vehicle, inp = this.input;
     const a = inp.axes();
+    // tank prorazí zdi i ploty, rychlé auto jen plot (dřív než se srazí)
+    if (v.isTank && a.y) this.weapons?.ramBreak(v, true, Math.sign(a.y));
+    else if (Math.hypot(v.vx, v.vz) > 14) this.weapons?.ramBreak(v, false);
     v.drive(dt, { throttle: a.y, steer: -a.x, hand: inp.down('Space') }, this.city);
     this.weapons?.runOver(v);
-    if (v.isTank) this.updateTankGun(v, dt);
+    if (v.isTank) { this.updateTankGun(v, dt); this.weapons?.crushCars(v); }
     if (v.lastImpact > 6) this.audio.crash(v.lastImpact);
     if (v.dead && v.sink > 2.4) {
       this.toast('Auto skončilo v řece!');
@@ -1291,6 +1294,31 @@ export class Game {
     m.userData.flame.scale.set(1, 0.5 + (v.spd / MAX) * 1.8, 1);
     this.player.x = v.x; this.player.z = v.z; this.player.y = v.y;
     this.hud.setSpeed(v.spd * 3.6, null, Math.round(v.y - city.ground(v.x, v.z)));
+    this.updateJetGuns(v, dt);
+  }
+
+  /** Zbraně stíhačky: 1 = kanón (dávky), 2 = rakety; střelba myší, F nebo K (na telefonu 💥). */
+  updateJetGuns(v, dt) {
+    const inp = this.input, W = this.weapons;
+    if (!W) return;
+    if (inp.hit('Digit1') || inp.hit('Numpad1')) { this.jetWpn = 1; this.toast('✈ Kanón – dávky (myš / F)'); }
+    if (inp.hit('Digit2') || inp.hit('Numpad2')) { this.jetWpn = 2; this.toast('🚀 Rakety (myš / F)'); }
+    if (inp.hit('KeyQ')) { this.jetWpn = this.jetWpn === 2 ? 1 : 2; this.toast(this.jetWpn === 2 ? '🚀 Rakety' : '✈ Kanón'); }
+    this.jetWpn ||= 1;
+    this.jetCool = (this.jetCool || 0) - dt;
+    const firing = inp.mouseBtn || inp.down('KeyF') || inp.down('KeyK');
+    if (!firing || this.jetCool > 0) return;
+    const m = v.mesh;
+    const D = new THREE.Vector3(0, 0, 1).applyQuaternion(m.quaternion).normalize();
+    if (this.jetWpn === 1) {
+      this.jetCool = 0.045;
+      const O = new THREE.Vector3(0.7 * ((this.jetSide = -(this.jetSide || 1)) || 1), 1.5, 8.5).applyMatrix4(m.matrixWorld);
+      W.jetBurst(O, D);
+    } else {
+      this.jetCool = 0.32;
+      const O = new THREE.Vector3(3.2 * ((this.jetSide = -(this.jetSide || 1)) || 1), 1.2, 1.5).applyMatrix4(m.matrixWorld);
+      W.fireRocket(O, D, false, 150 + v.spd);
+    }
   }
 
   crashJet() {
