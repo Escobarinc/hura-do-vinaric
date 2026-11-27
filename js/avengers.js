@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127235908';
+import { makeHuman, animateHuman } from './entities.js?v=20261128000204';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -550,6 +550,42 @@ export class Avengers {
     const tag = label('DOOM', '#39ff14'); tag.material.toneMapped = false; tag.material.color.set('#7dff5c'); g.add(tag);
     this.doom = { st: 'fall', t: 0, hp: 300, x, z, y, m, b, g, beam, core, ring, cape, hood, eyes, light, tag, cy: y + 95, scale: 1.7, hitT: 0, cool: 0 };
     m.position.set(x, y + 95, z); m.rotation.y = P.FACE;
+    // zelené blesky kolem sloupu světla
+    this.doom.bolts = Array.from({ length: 12 }, () => { // každý blesk = svazek 5 čar vedle sebe, aby byl tlustý a jasný
+      const l = new THREE.Line(new THREE.BufferGeometry().setFromPoints(Array.from({ length: 14 }, () => new THREE.Vector3())), new THREE.LineBasicMaterial({ color: '#8dff6a', transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })); l.frustumCulled = false; l.visible = false; g.add(l);
+      for (const [ox, oz, c] of [[0.14, 0, '#d9ffcf'], [-0.14, 0, '#8dff6a'], [0, 0.14, '#d9ffcf'], [0, -0.14, '#8dff6a']]) { const l2 = new THREE.Line(l.geometry, new THREE.LineBasicMaterial({ color: c, transparent: true, blending: THREE.AdditiveBlending, toneMapped: false })); l2.position.set(ox, 0, oz); l2.frustumCulled = false; l.add(l2); }
+      return { l, t: 0 }; });
+    this.doom.boltT = 0;
+    this.doomMusic(true);
+  }
+  /** Strašidelná hudba k Doomovi (vlastní, syntetická): hluboký hukot, disharmonický sbor, údery a kvílení. Jde mimo hlavní hlasitost hry, která je ztlumená. */
+  doomMusic(on) {
+    const c = this.G.audio?.ctx;
+    if (!on) { const M = this.dm; if (!M) return; this.dm = null; const t = c.currentTime; M.out.gain.cancelScheduledValues(t); M.out.gain.setValueAtTime(M.out.gain.value, t); M.out.gain.linearRampToValueAtTime(0, t + 1.5); clearInterval(M.iv); setTimeout(() => { for (const n of M.nodes) { try { n.stop(); } catch { /* už stojí */ } } M.out.disconnect(); }, 1800); return; }
+    if (!c || this.dm) return;
+    const t = c.currentTime, out = c.createGain(), nodes = [];
+    out.gain.setValueAtTime(0, t); out.gain.setValueAtTime(0, t + 1.2); out.gain.linearRampToValueAtTime(0.75, t + 5.5); out.connect(c.destination); // nejdřív chvíle úplného ticha
+    const osc = (type, f, vol, lp, det = 0) => { const o = c.createOscillator(), g = c.createGain(), fl = c.createBiquadFilter(); o.type = type; o.frequency.value = f; o.detune.value = det; fl.type = 'lowpass'; fl.frequency.value = lp; g.gain.value = vol; o.connect(fl).connect(g).connect(out); o.start(t); nodes.push(o); return { o, g, fl }; };
+    // hukot: dvě rozladěné pily + sub
+    osc('sawtooth', 41.2, 0.3, 160); osc('sawtooth', 41.2, 0.3, 160, 18); osc('sine', 27.5, 0.5, 120);
+    // disharmonický „sbor“: tritón a malá sekunda, pomalé chvění
+    const lfo = c.createOscillator(), lg = c.createGain(); lfo.frequency.value = 0.23; lg.gain.value = 0.05; lfo.connect(lg); lfo.start(t); nodes.push(lfo);
+    for (const [f, d] of [[110, 0], [116.5, 7], [155.6, -6], [220, 9], [233.1, -8]]) { const v = osc('triangle', f, 0.07, 700, d); lg.connect(v.g.gain); }
+    // kvílení ve výškách, které pomalu klouže
+    const wh = osc('sine', 1318, 0.018, 4000); wh.o.frequency.setValueAtTime(1318, t); wh.o.frequency.linearRampToValueAtTime(1245, t + 9); wh.o.frequency.linearRampToValueAtTime(1397, t + 20); wh.o.frequency.linearRampToValueAtTime(1175, t + 40);
+    const wh2 = osc('sine', 1865, 0.01, 5000); wh2.o.frequency.linearRampToValueAtTime(1760, t + 25);
+    // pomalé údery (jako kroky / tlukot)
+    const hit = () => { const n = c.currentTime, o = c.createOscillator(), g = c.createGain(); o.type = 'sine'; o.frequency.setValueAtTime(95, n); o.frequency.exponentialRampToValueAtTime(28, n + 1.1); g.gain.setValueAtTime(0.9, n); g.gain.exponentialRampToValueAtTime(0.001, n + 1.6); o.connect(g).connect(out); o.start(n); o.stop(n + 1.7); };
+    const iv = setInterval(hit, 3400); setTimeout(hit, 1500);
+    this.dm = { out, nodes, iv };
+  }
+  /** Hrom k zelenému blesku (jde přes hudbu Dooma, ne přes ztlumenou hlasitost hry). */
+  thunder(vol = 0.6) {
+    const c = this.G.audio?.ctx, M = this.dm; if (!c || !M) return;
+    const dur = 1.2 + Math.random(), b = c.createBuffer(1, c.sampleRate * dur, c.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / d.length, 2);
+    const s2 = c.createBufferSource(), f = c.createBiquadFilter(), g = c.createGain(); s2.buffer = b; f.type = 'lowpass'; f.frequency.value = 180 + Math.random() * 500; g.gain.value = vol;
+    s2.connect(f).connect(g).connect(M.out); s2.start();
   }
   doomPos() { const D = this.doom; return D ? { x: D.x, y: D.cy + 1.6, z: D.z } : null; }
   hitDoomNear(x, z, rad, dmg, from) { const D = this.doom; if (!D || D.st !== 'stand' || Math.hypot(D.x - x, D.z - z) > rad) return false; this.hitDoom(dmg, from); return true; }
@@ -609,7 +645,21 @@ export class Avengers {
     at(D.cape, 'torso', 0, 0.55, -0.26, 0.9); D.cape.rotation.x = D.st === 'stand' ? 0.12 + Math.sin(D.t * 2) * 0.05 : -0.7;
     at(D.hood, 'head', 0, 0.2, -0.03, 1.35); for (const [e, ex] of D.eyes) at(e, 'head', ex, 0.2, 0.3, 1.35);
     D.tag.position.set(D.x, py + 1.76 * s + 0.7, D.z);
-    D.light.position.set(D.x, py + 3, D.z); D.light.intensity = 5200 * (0.85 + Math.sin(D.t * 5) * 0.15) * (D.hitT > 0 ? 1.8 : 1);
+    // zelené blesky: při sestupu čím dál hustší, po přistání občas; každý úder blýskne a zahřmí
+    D.boltT = Math.max(0, D.boltT - dt);
+    const rate = D.st === 'fall' ? 0.6 + Math.min(1, D.t / 7) * 5 : D.st === 'stand' ? (D.hitT > 0 ? 6 : 0.7) : 3;
+    for (const B of D.bolts) {
+      B.t -= dt;
+      if (B.t <= 0 && B.l.visible) B.l.visible = false;
+      if (B.t <= -0.05 && Math.random() < dt * rate / 2) {
+        const near = Math.random() < 0.45, rad = near ? 3 : 8 + Math.random() * 30, an = Math.random() * 6.28, ex = D.x + Math.cos(an) * rad, ez = D.z + Math.sin(an) * rad, ey = G.city.ground(ex, ez) + (near ? 1.8 : 0);
+        const sx = ex + (Math.random() - 0.5) * 30, sz = ez + (Math.random() - 0.5) * 30, a = B.l.geometry.attributes.position;
+        for (let k = 0; k < 14; k++) { const u = k / 13, j = Math.sin(u * Math.PI) * 6; a.setXYZ(k, sx + (ex - sx) * u + (Math.random() - 0.5) * j, ey + 95 * (1 - u), sz + (ez - sz) * u + (Math.random() - 0.5) * j); }
+        a.needsUpdate = true; B.l.visible = true; B.t = 0.1 + Math.random() * 0.18;
+        this.flash(ex, ey + 0.5, ez, 5 + Math.random() * 6, '#8dff6a'); D.boltT = 0.14; this.thunder(near ? 0.8 : 0.45);
+      } else if (B.l.visible && Math.random() < 0.3) B.l.material.opacity = 0.4 + Math.random() * 0.6;
+    }
+    D.light.position.set(D.x, py + 3, D.z); D.light.intensity = 5200 * (0.85 + Math.sin(D.t * 5) * 0.15) * (D.hitT > 0 ? 1.8 : 1) * (D.boltT > 0 ? 3.2 : 1);
     D.beam.material.opacity = 0.2 + Math.sin(D.t * 3) * 0.05; D.core.material.opacity = D.st === 'stand' ? 0.12 : 0.4; D.beam.rotation.y += dt * 0.4;
     D.ring.scale.setScalar(1 + Math.sin(D.t * 2.5) * 0.08);
   }
@@ -617,7 +667,7 @@ export class Avengers {
   endDoom(beaten, hard = false) {
     const D = this.doom, G = this.G, P = this.p; if (!D) return;
     P.doom = false; if (G.audio?.master) G.audio.master.gain.value = this._gain ?? 0.5;
-    D.light.intensity = 0;
+    D.light.intensity = 0; this.doomMusic(false); for (const B of D.bolts || []) B.l.visible = false;
     if (this._music && P.music && !hard) P.music.play().catch(() => {});
     for (const H of this.heroes) { if (H.vs) { H.vs = null; H.flying = false; if (!H.gone && this.ctrl !== H) { H.home = 'stage'; this.route(H, this.W(3.3, H.r)); } } }
     if (beaten) { for (let k = 0; k < 9; k++) this.flash(D.x + (Math.random() - 0.5) * 5, D.cy + 1 + Math.random() * 3, D.z + (Math.random() - 0.5) * 5, 8 + Math.random() * 10, k % 2 ? '#39ff14' : '#ffffff'); G.audio?.noise?.(1.6, 0.9, 110); G.toast?.('💥 DOOM je poražen! Světla a hudba se vracejí.'); }
