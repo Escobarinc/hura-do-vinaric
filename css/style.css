@@ -205,3 +205,4 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
   .fc-top { grid-column: span 2; grid-row: auto; aspect-ratio: 16 / 10; }
   .fc b { font-size: 13px; } .fc span { font-size: 11px; }
 }
+.feat .fc:last-child { grid-column: span 2; aspect-ratio: auto; } /* vyplní poslední řádek */
