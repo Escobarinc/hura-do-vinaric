@@ -277,3 +277,19 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 /* záře jen na VINÁRNA a jen lehce, VŽDYCKY bez záře */
 .logo span { text-shadow: 0 3px 0 rgba(0,0,0,.45) !important; }
 .logo b { text-shadow: 0 0 6px rgba(57,255,20,.18), 0 3px 0 rgba(0,0,0,.45) !important; }
+/* úvod v2: nápis přijede zezadu (přibližuje se a zvětšuje), pak před něj spadne mříž a zůstane */
+.logo-stage .logo { animation: logo-approach 1.9s cubic-bezier(.16,.84,.3,1) both !important; z-index: 1 !important; }
+.gate { z-index: 2 !important; animation: gate-drop 0.75s cubic-bezier(.55,0,.75,.25) 1.75s both !important; }
+@keyframes logo-approach {
+  0% { transform: translateZ(-1600px) scale(.08); opacity: 0; filter: blur(6px) brightness(.5); }
+  25% { opacity: .6; }
+  85% { transform: translateZ(40px) scale(1.04); opacity: 1; filter: blur(0) brightness(1.1); }
+  100% { transform: none; opacity: 1; filter: none; }
+}
+@keyframes gate-drop {
+  0% { transform: translateY(-140%); }
+  70% { transform: translateY(3%); }
+  82% { transform: translateY(-5%); }
+  92% { transform: translateY(1%); }
+  100% { transform: translateY(0); }
+}
