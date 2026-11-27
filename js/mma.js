@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127143153';
-import { Crowd } from './crowd.js?v=20261127143153';
-import { PrisonFX } from './prisonfx.js?v=20261127143153';
+import { makeHuman, animateHuman } from './entities.js?v=20261127143346';
+import { Crowd } from './crowd.js?v=20261127143346';
+import { PrisonFX } from './prisonfx.js?v=20261127143346';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -17,7 +17,7 @@ const CARPET_A = Math.PI * 0.82; // směr uličky s kobercem
 const VOICE = { // hlášky hlasatelky (nahrané, hrají i na telefonu)
   intro: 'mma_intro', intro3: 'mma_intro3', red: 'mma_red', red_you: 'mma_red_you', red3: 'mma_red3', rules: 'mma_rules',
   r1: 'mma_r1', r2: 'mma_r2', r3: 'mma_r3', e1: 'mma_e1', e2: 'mma_e2',
-  ko_guard: 'mma_ko_guard', ko_con: 'mma_ko_con', dec_guard: 'mma_dec_guard', dec_con: 'mma_dec_con',
+  knife: 'mma_knife', ko_guard: 'mma_ko_guard', ko_con: 'mma_ko_con', dec_guard: 'mma_dec_guard', dec_con: 'mma_dec_con',
 };
 
 export class MMA {
@@ -280,7 +280,7 @@ export class MMA {
   teamHp(list) { return list.reduce((s, f) => s + Math.max(0, f.hp), 0) / list.length; }
   updateHud() {
     const $ = (id) => document.getElementById(id);
-    if (!this.hud) return;
+    if (!this.hud || !$('mma-b')) return;
     $('mma-b').style.width = `${this.teamHp(this.blue)}%`; $('mma-r').style.width = `${this.teamHp(this.red)}%`;
     $('mma-bn').textContent = `🔵 ${this.team ? 'Bachaři' : this.blue[0].name} ${Math.round(this.teamHp(this.blue))}`;
     $('mma-rn').textContent = `${Math.round(this.teamHp(this.red))} ${this.team ? (this.playAs ? 'Vězni (TY)' : 'Vězni') : this.red[0].name}${this.knife ? ' 🔪' : ''} 🔴`;
@@ -484,8 +484,10 @@ export class MMA {
     else { k.position.set(0.3, 1.1, 0.3); f.m.add(k); }
     this.knife = k;
     this.game.toast?.('🔪 Vytáhl jsi nůž! Myš / F = bodnout');
-    this.status = '🔪 Vězeň vytáhl nůž!';
+    this.say('knife', 'Sakra! On má nůž!');
+    this.status = '🔪 Sakra, on má nůž!';
     this.hype = 1;
+    this.game.prisonFx?.bark?.();
   }
   updateKnife() { /* nůž je přichycený na pěsti, nic dalšího */ }
   ko(w, l) {
