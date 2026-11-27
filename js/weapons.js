@@ -881,7 +881,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     const G = this.game, inp = G.input;
     let pick = null;
     for (let k = 0; k < NW; k++) if (inp.hit('Digit' + k) || inp.hit('Numpad' + k)) pick = k;
-    if (inp.hit('Digit6') || inp.hit('Numpad6')) pick = 0; // 6 = pěsti (jako 0)
+    if (inp.hit('Digit6') || inp.hit('Numpad6') || inp.hit('Digit0') || inp.hit('Numpad0')) { pick = 0; if (this.slot === 0 && G.mode === 'foot') G.toast?.('👊 Pěsti (6) – myš / F = rána'); } // 6 / 0 = pěsti
     // Q / kolečko myši: další zbraň dokola (0 → 1 → … → bazuka → 0)
     if (inp.hit('KeyQ')) pick = (this.slot + 1) % NW;
     if (inp.wheel) { pick = (this.slot + (inp.wheel > 0 ? 1 : NW - 1)) % NW; inp.wheel = 0; }

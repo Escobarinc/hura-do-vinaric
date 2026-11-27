@@ -1,4 +1,4 @@
-import { fmtMoney } from './util.js?v=20261127140536';
+import { fmtMoney } from './util.js?v=20261127141810';
 
 const $ = (id) => document.getElementById(id);
 const MAP_SCALE = 0.5; // px na metr v předrenderované mapě
@@ -86,6 +86,7 @@ export class Hud {
         heli: [['Stoupat', 'Mezerník'], ['Klesat', 'Shift'], ['Otáčení', 'A / D']],
         jet: [['Plyn', 'W'], ['Stoupat', 'Mezerník'], ['Klesat', 'Shift'], ['Kanón / rakety', '1 / 2'], ['Palba', 'F / myš']],
         trolley: [['Vystoupit v zastávce', 'E']],
+        mma: [['Rána', 'myš / F'], ['Kop', 'G / Q'], ['Kryt', 'Shift'], ['Nůž', 'O']],
       }[m] || [];
       e.keys.innerHTML = k.map(([a, b]) => `<div>${a} <kbd>${b}</kbd></div>`).join('');
     });
@@ -96,7 +97,7 @@ export class Hud {
       const pl = this.city.placeName(F.x, F.z);
       e.locName.textContent = pl.street || pl.district;
       e.locSub.textContent = pl.street ? pl.district : 'Vinařice';
-      e.locIcon.textContent = { foot: '⌂', car: '🚗', heli: '✚', jet: '✈', trolley: '🚌' }[game.mode];
+      e.locIcon.textContent = ({ foot: '⌂', car: '🚗', heli: '✚', jet: '✈', trolley: '🚌', mma: '🥊' }[game.mode] || '⌂');
     }
     this.drawMini(game);
   }

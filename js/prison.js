@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127140536';
-import { labelTexture } from './textures.js?v=20261127140536';
-import { Crowd } from './crowd.js?v=20261127140536';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127141810';
+import { labelTexture } from './textures.js?v=20261127141810';
+import { Crowd } from './crowd.js?v=20261127141810';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1239,6 +1239,10 @@ export class PrisonLife {
     add('🚌 Eskortní autobusy', () => { this.goToPrison(); this.startEscort(2, 35); this.game.prisonFx?.announce('Pozor, přijíždí eskorta. Uvolněte vjezd.'); });
     add('🚒 Hasičský zásah', () => { this.goToPrison(); this.startFire(); });
     add('🚨 Policejní zásah', () => this.startRiot());
+    add('🥊 MMA zápas', () => { this.goToPrison(); this.game.mma.start('watch'); });
+    add('🥊 MMA – hraj za vězně', () => { this.goToPrison(); this.game.mma.start('play'); });
+    add('🥊 MMA 3 na 3', () => { this.goToPrison(); this.game.mma.start('team'); });
+    add('🥊 3 na 3 – hraj', () => { this.goToPrison(); this.game.mma.start('teamPlay'); });
     add('🔄 Restart', () => this.resetAll());
     add('📍 Teleport (T)', () => this.game.hud.openTeleport(this.game));
     add('🧭 Navigace (N)', () => this.game.hud.openNav(this.game));
@@ -1251,6 +1255,7 @@ export class PrisonLife {
   }
   /** Restart areálu: zmizí mrtvoly a krev, skončí vzpoura, požár, autobusy, koně i výdej jídla. */
   resetAll() {
+    if (this.game.mma?.active) this.game.mma.finish();
     if (this.riot) this.riot = null;
     this.riotCrowd?.hideAll(true); this.policeCrowd?.hideAll(true);
     this.mealCrowd.hideAll(true);
