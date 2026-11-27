@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127150839';
-import { buildWorld } from './world.js?v=20261127150839';
-import { loadModels } from './models.js?v=20261127150839';
-import { Game } from './game.js?v=20261127150839';
-import { Hud } from './hud.js?v=20261127150839';
-import { Input } from './input.js?v=20261127150839';
-import { PrisonFX } from './prisonfx.js?v=20261127150839';
-import { Audio } from './audio.js?v=20261127150839';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127150839';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127150945';
+import { buildWorld } from './world.js?v=20261127150945';
+import { loadModels } from './models.js?v=20261127150945';
+import { Game } from './game.js?v=20261127150945';
+import { Hud } from './hud.js?v=20261127150945';
+import { Input } from './input.js?v=20261127150945';
+import { PrisonFX } from './prisonfx.js?v=20261127150945';
+import { Audio } from './audio.js?v=20261127150945';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127150945';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -18,7 +18,7 @@ import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
 const $ = (id) => document.getElementById(id);
 const mobile = matchMedia('(pointer: coarse)').matches || innerWidth < 700;
 
-$('btn-about').onclick = () => ($('about').hidden = !$('about').hidden);
+if ($('btn-about')) $('btn-about').onclick = () => ($('about').hidden = !$('about').hidden);
 $('btn-play').onclick = start;
 
 const audio = new Audio();
