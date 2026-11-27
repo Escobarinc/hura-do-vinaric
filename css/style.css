@@ -246,3 +246,7 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
 .about-foot h2 { font-size: 15px; margin: 0 0 6px; color: var(--ink); }
 .about-foot p { margin: 0 0 8px; }
 #menu .btn-primary { letter-spacing: .12em; }
+/* nápis: jiné písmo a jen jemná záře */
+.logo { font-family: "Russo One", var(--font) !important; animation: none !important; letter-spacing: .01em; }
+.logo span { color: #f2f6f0 !important; text-shadow: 0 0 6px rgba(57,255,20,.35) !important; }
+.logo b { color: #5dff3a !important; animation: none !important; text-shadow: 0 0 5px rgba(57,255,20,.55), 0 0 14px rgba(57,255,20,.25) !important; }
