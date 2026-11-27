@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127194543';
-import { Crowd } from './crowd.js?v=20261127194543';
-import { PrisonFX } from './prisonfx.js?v=20261127194543';
+import { makeHuman, animateHuman } from './entities.js?v=20261127195253';
+import { Crowd } from './crowd.js?v=20261127195253';
+import { PrisonFX } from './prisonfx.js?v=20261127195253';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -419,6 +419,8 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
         for (const D of this.cageDoors || []) if (D.cur > 0) { open = true; const st = Math.min(D.cur, dt * 2.2); D.pivot.rotateY(-st); D.cur -= st; if (D.cur <= 0) { this.game.audio?.noise?.(0.25, 0.8, 300); this.game.audio?.blip?.(140, 0.2, 'square', 0.1, -40); } }
         if (!open) { this.phase = 'intro'; this.t = 0; this.status = ''; if (!this.playAs && this.cinematic) this.toggleCam(); this.say('rules', 'Pravidla znáte. Pěsti a kopy. Ťukněte si… a bojujte!'); }
       }
+    } else if (ph === 'teardown') {
+      this.teardownStep(dt);
     } else if (ph === 'intro') {
       for (const f of this.all) { const o = this.nearestFoe(f); if (o) f.h = Math.atan2(o.x - f.x, o.z - f.z); this.idle(f, dt); }
       if (this.t > 4) this.startRound(1);
@@ -440,15 +442,132 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       if (this.t > REST_S) this.startRound(this.round + 1);
     } else if (ph === 'end') {
       for (const f of this.all) { if (f.act === 'ko') this.updateAnim(f, dt); else if (f.team === this.winTeam) this.idle(f, dt, true); else this.idle(f, dt); }
-      if (this.t > 16) this.finish();
+      if (this.t > 12) this.startTeardown();
     }
     this.refStep(dt);
     this.mcStep(dt);
-    this.updateFans(dt);
+    if (this.phase !== 'teardown') this.updateFans(dt);
     this.updateLights(dt);
     this.updateHud();
   }
 
+  /* ---------------- po zápase: rozchod, kamiony a rozebrání oktagonu ---------------- */
+  static BARRACKS = [[-174.5, 1046], [-174.5, 1068], [-238, 1050.5], [-360, 1065.6], [-350.8, 1116], [-295, 1057.4], [-212.2, 1081], [-233, 1083.7]];
+  static TRUCK_IN = [[-388, 1238], [-397, 1224], [-407, 1211], [-428, 1186], [-412, 1178], [-371, 1157], [-356, 1148], [-340, 1140], [-311, 1150], [-303, 1147], [-293, 1141], [-280, 1129], [-262, 1134], [-250, 1140]];
+  makeTruck() {
+    const g = new THREE.Group(), black = new THREE.MeshStandardMaterial({ color: '#0d0e10', roughness: 0.45, metalness: 0.4 }), chrome = new THREE.MeshStandardMaterial({ color: '#c9ccd0', metalness: 0.9, roughness: 0.25 });
+    const glass = new THREE.MeshStandardMaterial({ color: '#1c2a36', roughness: 0.1, metalness: 0.5 }), tyre = new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.9 });
+    const cab = new THREE.Mesh(new THREE.BoxGeometry(2.5, 2.9, 2.4), black); cab.position.set(0, 2.0, 6.6);
+    const ws = new THREE.Mesh(new THREE.BoxGeometry(2.3, 1.1, 0.05), glass); ws.position.set(0, 2.6, 7.82);
+    const grill = new THREE.Mesh(new THREE.BoxGeometry(2.0, 0.8, 0.06), chrome); grill.position.set(0, 1.25, 7.82);
+    const trailer = new THREE.Mesh(new THREE.BoxGeometry(2.55, 3.4, 12.5), black); trailer.position.set(0, 2.45, -1.2);
+    // nápis na návěsu
+    const c = document.createElement('canvas'); c.width = 1024; c.height = 256; const cg = c.getContext('2d');
+    cg.fillStyle = '#0d0e10'; cg.fillRect(0, 0, 1024, 256); cg.fillStyle = '#39ff14'; cg.font = 'bold 120px sans-serif'; cg.textAlign = 'center'; cg.fillText('FIGHT NIGHT', 512, 170);
+    const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
+    for (const sd of [-1, 1]) { const sgn = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.4), new THREE.MeshStandardMaterial({ map: tx, emissive: '#ffffff', emissiveMap: tx, emissiveIntensity: 0.25 })); sgn.position.set(sd * 1.28, 2.6, -1.2); sgn.rotation.y = sd * Math.PI / 2; g.add(sgn); }
+    for (const [z, n] of [[6.9, 1], [4.6, 1], [-4.5, 2], [-5.9, 2]]) for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.45 * n, 16), tyre); w.rotation.z = Math.PI / 2; w.position.set(sd * 1.15, 0.52, z); g.add(w); }
+    const lights = new THREE.MeshStandardMaterial({ color: '#fff', emissive: '#fff6d8', emissiveIntensity: 2 });
+    for (const sd of [-0.85, 0.85]) { const l = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.2, 0.05), lights); l.position.set(sd, 1.2, 7.84); g.add(l); }
+    g.add(cab, ws, grill, trailer);
+    g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
+    this.game.scene.add(g);
+    return g;
+  }
+  startTeardown() {
+    this.phase = 'teardown'; this.t = 0; this.status = 'Vězni odcházejí na oddíly · přijíždí technika';
+    for (const f of [...this.all, this.ref]) this.game.scene.remove(f.m);
+    if (this.mc && !this.mc.gone) this.game.scene.remove(this.mc.m);
+    // diváci a bachaři: každý jde k nejbližším dveřím svého baráku a zaleze dovnitř
+    const B = MMA.BARRACKS;
+    for (const f of this.fans) { const d = B[Math.floor(Math.random() * B.length)]; f.tx = d[0] + (Math.random() - 0.5) * 2; f.tz = d[1] + (Math.random() - 0.5) * 2; f.sp = 1.3 + Math.random() * 0.6; f.delay = Math.random() * 6; f.gone = false; }
+    for (const p of this.guardPos) { const d = B[Math.floor(Math.random() * B.length)]; p.tx = d[0]; p.tz = d[1]; p.sp = 1.5; p.delay = 3 + Math.random() * 5; }
+    for (const d of this.dogs) this.game.scene.remove(d.m);
+    // dva dlouhé černé kamiony vjedou vjezdem zásobování
+    const path = MMA.TRUCK_IN;
+    this.trucks = [0, 1].map((k) => ({ m: this.makeTruck(), s: -k * 22, path, stage: 'in', stop: k ? 18 : 0 }));
+    this.pathLen = 0; this.pathCum = [0];
+    for (let i = 1; i < path.length; i++) { this.pathLen += Math.hypot(path[i][0] - path[i - 1][0], path[i][1] - path[i - 1][1]); this.pathCum.push(this.pathLen); }
+    // díly arény k odnesení (vše kromě světel stožárů, které jdou poslední)
+    this.parts = this.group.children.filter((o) => !o.isLight).sort((a, b) => Math.hypot(b.position.x - C.x, b.position.z - C.z) - Math.hypot(a.position.x - C.x, a.position.z - C.z));
+    this.workers = null;
+  }
+  truckAt(s) {
+    const P = MMA.TRUCK_IN, cum = this.pathCum;
+    s = Math.max(0, Math.min(this.pathLen, s));
+    let i = 1; while (i < cum.length - 1 && cum[i] < s) i++;
+    const k = (s - cum[i - 1]) / (cum[i] - cum[i - 1] || 1), a = P[i - 1], b = P[i];
+    return { x: a[0] + (b[0] - a[0]) * k, z: a[1] + (b[1] - a[1]) * k, h: Math.atan2(b[0] - a[0], b[1] - a[1]) };
+  }
+  teardownStep(dt) {
+    const G = this.game, city = G.city, t = this.game.time;
+    // rozchod diváků
+    let left = 0;
+    for (const f of this.fans) {
+      if (f.gone) continue;
+      if (this.crowd.dead[f.i]) { f.gone = true; continue; }
+      left++;
+      if ((f.delay -= dt) > 0) { this.crowd.set(f.i, f.x, f.y, f.z, f.h, 0, 'walk', t); continue; }
+      const dx = f.tx - f.x, dz = f.tz - f.z, d = Math.hypot(dx, dz);
+      if (d < 1.2 || this.t > 70) { f.gone = true; this.crowd.hide(f.i); continue; }
+      f.x += (dx / d) * f.sp * dt; f.z += (dz / d) * f.sp * dt; f.h = Math.atan2(dx, dz); f.y = city.ground(f.x, f.z);
+      this.crowd.set(f.i, f.x, f.y, f.z, f.h, f.sp, 'walk', t);
+    }
+    this.crowd.commit();
+    this.guardPos.forEach((p, i) => {
+      if (p.gone || this.guards.dead[i]) return;
+      if ((p.delay -= dt) > 0) { this.guards.set(i, p.x, p.y, p.z, p.h, 0, 'walk', t); return; }
+      const dx = p.tx - p.x, dz = p.tz - p.z, d = Math.hypot(dx, dz);
+      if (d < 1.2 || this.t > 70) { p.gone = true; this.guards.hide(i); return; }
+      p.x += (dx / d) * p.sp * dt; p.z += (dz / d) * p.sp * dt; p.h = Math.atan2(dx, dz); p.y = city.ground(p.x, p.z);
+      this.guards.set(i, p.x, p.y, p.z, p.h, p.sp, 'walk', t);
+    });
+    this.guards.commit();
+    // kamiony
+    let parked = 0;
+    for (const tr of this.trucks || []) {
+      const end = this.pathLen - tr.stop;
+      if (tr.stage === 'in') { tr.s = Math.min(end, tr.s + 6 * dt); if (tr.s >= end - 0.05) { tr.stage = 'park'; } }
+      else if (tr.stage === 'out') { tr.s -= 7 * dt; if (tr.s < -30) { tr.stage = 'gone'; G.scene.remove(tr.m); } }
+      if (tr.stage === 'park') parked++;
+      if (tr.stage !== 'gone') { const q = this.truckAt(tr.s), y = city.ground(q.x, q.z); tr.m.position.set(q.x, y, q.z); tr.m.rotation.y = tr.stage === 'out' ? q.h : q.h; tr.m.visible = tr.s > -1; }
+    }
+    // dělníci: 20 chlapů v reflexních vestách vyleze z kamionů a nosí díly
+    if (parked === 2 && !this.workers) {
+      this.status = 'Party rozebírá oktagon a nakládá do kamionů';
+      this.wCrowd ||= new Crowd(G.scene, { capacity: 20, shirt: '#f2c230', pants: '#22262c' });
+      this.workers = Array.from({ length: 20 }, (_, i) => { const tr = this.trucks[i % 2], back = this.truckAt(this.pathLen - tr.stop - 8); return { i, x: back.x, z: back.z, home: [back.x, back.z], tgt: null, carry: false, sp: 2.4 + Math.random() * 0.6 }; });
+    }
+    if (this.workers) {
+      let busy = false;
+      for (const w of this.workers) {
+        if (!w.tgt) {
+          if (!w.carry && this.parts.length) { w.part = this.parts.pop(); w.tgt = [w.part.position.x + (Math.random() - 0.5), w.part.position.z + (Math.random() - 0.5)]; }
+          else if (w.carry) w.tgt = [w.home[0] + (Math.random() - 0.5) * 2, w.home[1] + (Math.random() - 0.5) * 2];
+        }
+        if (w.tgt) {
+          busy = true;
+          const dx = w.tgt[0] - w.x, dz = w.tgt[1] - w.z, d = Math.hypot(dx, dz);
+          if (d < 0.6) {
+            if (!w.carry) { if (w.part) { w.part.visible = false; this.group.remove(w.part); } const extra = this.parts.pop(); if (extra) this.group.remove(extra); w.carry = true; G.audio?.noise?.(0.08, 0.12, 900); }
+            else w.carry = false;
+            w.tgt = null;
+          } else { w.x += (dx / d) * w.sp * dt; w.z += (dz / d) * w.sp * dt; w.h = Math.atan2(dx, dz); }
+        }
+        this.wCrowd.set(w.i, w.x, city.ground(w.x, w.z), w.z, w.h || 0, w.tgt ? w.sp : 0, w.carry ? 'aim' : 'walk', t);
+      }
+      this.wCrowd.commit();
+      // vše naloženo → zbytek (světla, podium) zmizí, dělníci nasednou a kamiony odjedou
+      if (!busy && !this.parts.length && !this.leaving) {
+        this.leaving = true; this.status = 'Kamiony odjíždějí';
+        this.wCrowd.hideAll(true);
+        for (const o of [...this.group.children]) this.group.remove(o);
+        for (const tr of this.trucks) tr.stage = 'out';
+      }
+    }
+    if (this.leaving && this.trucks.every((tr) => tr.stage === 'gone')) { this.leaving = false; this.finish(true); this.game.toast?.('Turnaj skončil · areál je uklizený'); }
+    if (this.t > 400) this.finish(true); // pojistka
+  }
   fadeMusic() {
     const a = this.music; if (!a) return;
     const id = setInterval(() => { a.volume = Math.max(0, a.volume - 0.06); if (a.volume <= 0.01) { a.pause(); clearInterval(id); } }, 120);
@@ -810,6 +929,9 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     G.scene.remove(this.group);
     for (const f of [...(this.all || []), this.ref, this.mc]) if (f) G.scene.remove(f.m);
     this.music?.pause(); this.music = null;
+    for (const tr of this.trucks || []) G.scene.remove(tr.m);
+    this.trucks = null; this.workers = null; this.leaving = false;
+    if (this.wCrowd) { this.wCrowd.hideAll(true); G.scene.remove(this.wCrowd.group); this.wCrowd = null; }
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }
