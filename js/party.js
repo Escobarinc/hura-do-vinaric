@@ -4,9 +4,9 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128000431';
-import { Avengers } from './avengers.js?v=20261128000431';
-import { Crowd } from './crowd.js?v=20261128000431';
+import { makeHuman, animateHuman } from './entities.js?v=20261128001130';
+import { Avengers } from './avengers.js?v=20261128001130';
+import { Crowd } from './crowd.js?v=20261128001130';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -373,11 +373,16 @@ export class Party {
   /* ---------------- průběh ---------------- */
   update(dt) {
     if (!this.active) return;
-    if (this.doom) { this.av.update(dt, 0); return; } // DOOM: vše zhasne, ztichne a nikdo se nehne
+    // DOOM: všechno se postupně zpomaluje, až úplně ztuhne (světla mezitím pohasínají)
+    const rdt = dt;
+    if (this.doom) { this.doomK = Math.max(0, (this.doomK ?? 1) - dt / 5.5); if (this.doomK <= 0) { this.av.update(rdt, this.beatAcc || 0); return; } dt *= this.doomK; } else this.doomK = 1;
+    this.pt = (this.pt || 0) + dt;
     this.t += dt;
     const G = this.game, F = this.fx, gy = this.gy;
     const mt = this.music && !this.music.paused ? this.music.currentTime : this.t;
-    const beatF = (mt * (this.bpm || BPM)) / 60, beat = beatF % 1, bar = Math.floor(beatF / 4);
+    let beatF = (mt * (this.bpm || BPM)) / 60;
+    if (this.doom) { this.beatAcc = (this.beatAcc ?? beatF) + (dt * (this.bpm || BPM)) / 60; beatF = this.beatAcc; } else this.beatAcc = beatF; // při Doomovi rytmus dojíždí s lidmi
+    const beat = beatF % 1, bar = Math.floor(beatF / 4);
     const hipL = this.lightStyle === 'hiphop' || (this.lightStyle === 'auto' && TRACKS[this.ti]?.genre === 'hiphop');
     // HIP HOP: světla se pohnou skokem na každý úder a pak drží, pomaleji; důraz na 2. a 4. dobu. DISKO: plynule a rychle
     const t = hipL ? (Math.floor(beatF) + Math.min(1, beat * 5)) * 0.32 * this.speed : this.t * this.speed;
@@ -436,7 +441,7 @@ export class Party {
     this.animatePeople(dt, beatF, pulse);
     this.updateRunway(dt, col);
     this.updatePerformers(dt, mt, beatF);
-    this.av.update(dt, beatF);
+    this.av.update(rdt, beatF);
   }
   drawLed(t, beat, col) {
     const wideL = this.led3k > 0.03, c = wideL ? this.ledWC : this.ledC, g = c.getContext('2d'), w = c.width, h = c.height;
@@ -483,7 +488,7 @@ export class Party {
     }
   }
   animatePeople(dt, beatF, pulse) {
-    const t = this.game.time, bounce = (ph) => Math.max(0, Math.sin((beatF + ph * 0.05) * Math.PI * 2)) * 0.22;
+    const t = this.pt || 0, bounce = (ph) => Math.max(0, Math.sin((beatF + ph * 0.05) * Math.PI * 2)) * 0.22;
     // DJ: kývání do rytmu, ruka nahoře na dropu
     animateHuman(this.dj, 0, dt);
     if (this.djBones.uaR) this.djBones.uaR.rotation.x -= 1.1 + (Math.floor(beatF / 8) % 2 ? Math.max(0, Math.sin(beatF * Math.PI)) * 1.6 : 0);
@@ -650,7 +655,7 @@ export class Party {
     }
   }
   updatePerformers(dt, mt, beatF) {
-    const t = this.game.time, tr = TRACKS[this.ti];
+    const t = this.pt || 0, tr = TRACKS[this.ti];
     // tyče: vyjíždění / zajíždění
     for (let i = (this.poles || []).length - 1; i >= 0; i--) {
       const p = this.poles[i];

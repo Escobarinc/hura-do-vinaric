@@ -1,11 +1,11 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261128000431';
-import { PrisonLife } from './prison.js?v=20261128000431';
-import { Weapons } from './weapons.js?v=20261128000431';
-import { MMA } from './mma.js?v=20261128000431';
-import { Party } from './party.js?v=20261128000431';
-import { PrisonFX } from './prisonfx.js?v=20261128000431';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261128000431';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261128001130';
+import { PrisonLife } from './prison.js?v=20261128001130';
+import { Weapons } from './weapons.js?v=20261128001130';
+import { MMA } from './mma.js?v=20261128001130';
+import { Party } from './party.js?v=20261128001130';
+import { PrisonFX } from './prisonfx.js?v=20261128001130';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261128001130';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 

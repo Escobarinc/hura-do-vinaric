@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128000431';
+import { makeHuman, animateHuman } from './entities.js?v=20261128001130';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -369,7 +369,7 @@ export class Avengers {
     if (this.sing) P.heroSinger = singer?.name || null;
     for (const H of this.heroes) {
       if (H.gone) continue;
-      if (this.doom && !H.vs && this.ctrl !== H && !H.jump) continue; // DOOM: nikdo se nehne, dokud nedostane povel k útoku
+      if (this.doom && !(this.p.doomK > 0) && !H.vs && this.ctrl !== H && !H.jump) continue; // DOOM: nikdo se nehne, dokud nedostane povel k útoku
       H.t += dt; H.cool -= dt; H.armT = Math.max(0, H.armT - dt); H.stun = Math.max(0, (H.stun || 0) - dt);
       let speed = 0, mode = null;
       if (this.ctrl === H) { // hrdina = hráč
@@ -531,8 +531,8 @@ export class Avengers {
     const P = this.p, G = this.G, RW = P.RW, L = P.rw?.L || 0;
     const [x, z] = L > 3 ? this.W(RW.f0 + L - 1.6, 0) : this.W(3.2, 0), y = this.floorY(x, z);
     // vše zhasne a ztichne
-    this._music = P.music && !P.music.paused; P.music?.pause(); this._gain = G.audio?.master?.gain.value; if (G.audio?.master) G.audio.master.gain.value = 0;
-    G.darkK = 0.012; P.doom = true; this.attack = false; this.sing = false; this.storm = null;
+    this._music = P.music && !P.music.paused; this._vol = P.music ? P.music.volume : 1; this._gain = G.audio?.master?.gain.value ?? 0.5;
+    G.darkK = G.darkK ?? 1; P.doom = true; // hudba se ztiší a světla pohasnou postupně (viz updateDoom) this.attack = false; this.sing = false; this.storm = null;
     const col = '#1f7a2e', m = makeHuman({ name: 'Suit_Male', uniform: { shirt: col, pants: '#14501e', hat: '#14501e' }, skin: '#b9c0c6', scale: 1.7, tint: false });
     m.traverse((o) => { if (o.isMesh && o.material) { o.material = o.material.clone(); o.material.toneMapped = false; const c = o.material.color.clone(); o.material.emissive = c.clone().multiplyScalar(0.55); o.material.color.multiplyScalar(0.002); } });
     G.scene.add(m);
@@ -639,6 +639,9 @@ export class Avengers {
     if (this.leaving) { const Q = this.leaving; Q.t += dt; Q.cy += dt * (8 + Q.t * 30); Q.m.position.y = Q.cy; Q.g.visible = Q.t < 0.1 || Math.random() < 0.7; if (Q.cy > Q.y + 150) { G.scene.remove(Q.m); this.p.group.remove(Q.g); this.leaving = null; } }
     const D = this.doom; if (!D) { if (G.darkK != null && G.darkK < 1) G.darkK = Math.min(1, G.darkK + dt * 0.5); return; }
     D.t += dt; D.cool -= dt; D.hitT = Math.max(0, D.hitT - dt);
+    // hudba se rychle ztiší, světla pohasínají pomaleji
+    if (!D.muted) { const f = Math.max(0, 1 - D.t / 2.5), M = this.p.music; if (M) M.volume = this._vol * f; if (G.audio?.master) G.audio.master.gain.value = this._gain * f; if (f <= 0) { D.muted = true; if (M) { M.pause(); M.volume = this._vol; } } }
+    if (G.darkK > 0.012) G.darkK = Math.max(0.012, G.darkK * (1 - Math.min(0.5, dt * 0.55)));
     const fl = D.y;
     if (D.st === 'fall') { // snáší se v zeleném světle z nebe
       const a = Math.min(1, D.t / 7), e = 1 - Math.pow(1 - a, 2.2); D.cy = fl + 95 * (1 - e);
@@ -656,7 +659,7 @@ export class Avengers {
     D.tag.position.set(D.x, py + 1.76 * s + 0.7, D.z);
     // zelené blesky: při sestupu čím dál hustší, po přistání občas; každý úder blýskne a zahřmí
     D.boltT = Math.max(0, D.boltT - dt);
-    const rate = D.st === 'fall' ? 0.6 + Math.min(1, D.t / 7) * 5 : D.st === 'stand' ? (D.hitT > 0 ? 6 : 0.7) : 3;
+    const rate = D.st === 'fall' ? 2.2 + Math.min(1, D.t / 7) * 4 : D.st === 'stand' ? (D.hitT > 0 ? 6 : 0.7) : 3;
     for (const B of D.bolts) {
       B.t -= dt;
       if (B.t <= 0 && B.l.visible) B.l.visible = false;
@@ -676,7 +679,7 @@ export class Avengers {
   endDoom(beaten, hard = false) {
     const D = this.doom, G = this.G, P = this.p; if (!D) return;
     P.doom = false; if (G.audio?.master) G.audio.master.gain.value = this._gain ?? 0.5;
-    D.light.intensity = 0; this.doomMusic(false); for (const B of D.bolts || []) B.l.visible = false;
+    D.light.intensity = 0; if (P.music) P.music.volume = this._vol ?? 0.95; this.doomMusic(false); for (const B of D.bolts || []) B.l.visible = false;
     if (this._music && P.music && !hard) P.music.play().catch(() => {});
     for (const H of this.heroes) { if (H.vs) { H.vs = null; H.flying = false; if (!H.gone && this.ctrl !== H) { H.home = 'stage'; this.route(H, this.W(3.3, H.r)); } } }
     if (beaten) { for (let k = 0; k < 9; k++) this.flash(D.x + (Math.random() - 0.5) * 5, D.cy + 1 + Math.random() * 3, D.z + (Math.random() - 0.5) * 5, 8 + Math.random() * 10, k % 2 ? '#39ff14' : '#ffffff'); G.audio?.noise?.(1.6, 0.9, 110); G.toast?.('💥 DOOM je poražen! Světla a hudba se vracejí.'); }
