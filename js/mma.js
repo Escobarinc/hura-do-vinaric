@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127142451';
-import { Crowd } from './crowd.js?v=20261127142451';
-import { PrisonFX } from './prisonfx.js?v=20261127142451';
+import { makeHuman, animateHuman } from './entities.js?v=20261127143103';
+import { Crowd } from './crowd.js?v=20261127143103';
+import { PrisonFX } from './prisonfx.js?v=20261127143103';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -127,7 +127,9 @@ export class MMA {
       las.position.set(px, gy + Hh - 0.6, pz); g.add(las);
       this.lasers.push({ las, px, py: gy + Hh - 0.6, pz, ph: k * 0.9 });
     }
-    const key = new THREE.PointLight('#fff4dc', 60, 32, 1.5); key.position.set(C.x, gy + 9, C.z); g.add(key);
+    const key = new THREE.PointLight('#fff4dc', 90, 34, 1.4); key.position.set(C.x, gy + 9, C.z); g.add(key);
+    // světla ze stožárů na diváky a okolí (turnaj se koná večer, aréna svítí do dálky)
+    for (let k = 0; k < 6; k++) { const a = (k / 6) * Math.PI * 2 + 0.3; const l = new THREE.PointLight('#fff1d6', 45, 30, 1.3); l.position.set(C.x + Math.cos(a) * 15, gy + 8.5, C.z + Math.sin(a) * 15); g.add(l); }
     this.colorLights = ['#ff3355', '#3388ff'].map((c, i) => { const l = new THREE.PointLight(c, 18, 26, 1.6); l.position.set(C.x + (i ? 6 : -6), gy + 6, C.z); g.add(l); return l; });
     scene.add(g);
     // fanoušci: 500 vězňů kolem klece (mimo uličku)
@@ -189,8 +191,10 @@ export class MMA {
     this.active = true;
     this.playAs = mode === 'play' || mode === 'teamPlay';
     this.team = mode === 'team' || mode === 'teamPlay';
-    if (G.vehicle) G.exit?.();
-    G.mode = 'mma'; G.player.mesh.visible = false; G.wanted = 0;
+    G.setHour = 21; // turnaje jsou vždy večer, za tmy
+    G.wanted = 0;
+    this.cinematic = !this.playAs ? false : true; // divák: normální pohled ze hry (V = kamera arény)
+    if (this.playAs) { if (G.vehicle) G.exit?.(); G.mode = 'mma'; G.player.mesh.visible = false; }
     const N = this.team ? 3 : 1;
     const guardNames = ['Bachař Novák', 'Bachař Dvořák', 'Bachař Černý'], conNames = ['Vězeň „Kladivo“', 'Vězeň „Žiletka“', 'Vězeň „Tank“'];
     const conModels = ['Casual_Bald', 'Casual2_Male', 'Casual3_Male'];
@@ -214,7 +218,7 @@ export class MMA {
     this.phase = 'walkBlue'; this.t = 0; this.round = 0; this.clock = ROUND_S;
     this.makeHud();
     this.say(this.team ? 'intro3' : 'intro', this.team ? 'Vítejte na Vinařice Fight Night! Tři na tři! V modrém rohu… tým bachařů!' : 'Vítejte na Vinařice Fight Night! V modrém rohu… bachař Novák!');
-    G.toast?.(this.playAs ? '🥊 Hraješ za vězně · WASD · myš / F rána · G / Q kop · Shift kryt · O nůž' : '🥊 MMA zápas: bachaři proti vězňům');
+    G.toast?.(this.playAs ? '🥊 Hraješ za vězně · WASD · myš / F rána · G / Q kop · Shift kryt · O nůž' : '🥊 MMA zápas za tmy · V = kamera arény / pohled ze hry');
     this.knife = null;
   }
 
@@ -244,6 +248,17 @@ export class MMA {
     const b = document.createElement('button'); b.id = 'mma-end'; b.textContent = '✕ Ukončit zápas';
     b.addEventListener('click', (e) => { e.stopPropagation(); this.finish(); });
     document.body.appendChild(b); this.endBtn = b;
+    if (!this.playAs) {
+      const c = document.createElement('button'); c.id = 'mma-cam'; c.textContent = '🎥 Kamera arény (V)';
+      c.style.cssText = 'position:fixed;right:16px;bottom:62px;z-index:41;pointer-events:auto;font:800 14px Manrope,sans-serif;color:#fff;background:rgba(14,18,23,.85);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 14px;cursor:pointer';
+      c.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCam(); c.blur(); });
+      document.body.appendChild(c); this.camBtn = c;
+    }
+  }
+  toggleCam() {
+    this.cinematic = !this.cinematic;
+    if (this.camBtn) this.camBtn.textContent = this.cinematic ? '🎮 Pohled ze hry (V)' : '🎥 Kamera arény (V)';
+    this.camP = null;
   }
   teamHp(list) { return list.reduce((s, f) => s + Math.max(0, f.hp), 0) / list.length; }
   updateHud() {
@@ -260,6 +275,7 @@ export class MMA {
   /* ---------------- průběh ---------------- */
   update(dt) {
     if (!this.active) return;
+    if (!this.playAs && this.game.input.hit('KeyV')) this.toggleCam();
     this.t += dt;
     const ph = this.phase;
     if (ph === 'walkBlue' || ph === 'walkRed') {
@@ -597,11 +613,13 @@ export class MMA {
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }
-    this.hud?.remove(); this.endBtn?.remove(); document.getElementById('mma-css')?.remove();
+    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); document.getElementById('mma-css')?.remove();
     PrisonFX.voiceEl()?.pause();
-    G.mode = 'foot';
-    const s = this.carpetStart;
-    Object.assign(G.player, { x: s[0] + 2, z: s[1], y: G.city.ground(s[0] + 2, s[1]), vy: 0 });
+    if (G.mode === 'mma') {
+      G.mode = 'foot';
+      const s = this.carpetStart;
+      Object.assign(G.player, { x: s[0] + 2, z: s[1], y: G.city.ground(s[0] + 2, s[1]), vy: 0 });
+    }
     G.player.mesh.visible = true;
     G.toast?.('Zápas skončil');
   }

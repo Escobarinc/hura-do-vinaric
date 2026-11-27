@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127142451';
-import { PrisonLife } from './prison.js?v=20261127142451';
-import { Weapons } from './weapons.js?v=20261127142451';
-import { MMA } from './mma.js?v=20261127142451';
-import { PrisonFX } from './prisonfx.js?v=20261127142451';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127142451';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127143103';
+import { PrisonLife } from './prison.js?v=20261127143103';
+import { Weapons } from './weapons.js?v=20261127143103';
+import { MMA } from './mma.js?v=20261127143103';
+import { PrisonFX } from './prisonfx.js?v=20261127143103';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127143103';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -354,6 +354,7 @@ export class Game {
     else if (this.mode === 'jet') this.updateJet(dt);
     else if (this.mode === 'trolley') this.updateRide(dt);
     else if (this.mode === 'mma') this.mma.update(dt);
+    if (this.mma?.active && this.mode !== 'mma') this.mma.update(dt); // divák: zápas běží, hráč se volně pohybuje
 
     this.updateFallingAircraft(dt);
     if (inp.hit('KeyE')) this.handleE();
@@ -1460,7 +1461,7 @@ export class Game {
 
   /* --------------- kamera --------------- */
   updateCamera(dt) {
-    if (this.mode === 'mma') { this.mma.camera(this.camera, dt); return; }
+    if (this.mode === 'mma' || (this.mma?.active && this.mma.cinematic)) { this.mma.camera(this.camera, dt); return; }
     let tx, ty, tz, dist, heading = null;
     if (this.mode === 'foot') { const P = this.player; tx = P.x; ty = P.y + 1.6; tz = P.z; dist = this.camFar ? 11 : 6.5; }
     else if (this.mode === 'car') { const v = this.vehicle; tx = v.x; ty = v.y + 1.8; tz = v.z; dist = this.camFar ? 15 : 9.5; heading = Math.abs(v.v) > 2 ? (v.v > 0 ? v.h : v.h) : null; }
