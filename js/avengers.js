@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128001130';
+import { makeHuman, animateHuman } from './entities.js?v=20261128001635';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -15,11 +15,11 @@ const HEROES = [
   { id: 'hulk', name: 'Hulk', model: 'Casual_Bald', shirt: '#4caf3a', pants: '#5b2a86', hat: '#111111', skin: '#4caf3a', scale: 2.3, r: 6.3, speed: 6 },
 ];
 const ABIL = {
-  iron: [['fly', '🚀 Vzlétni / přistaň'], ['shoot', '💥 Střílej z ruky']],
-  cap: [['hammer', '🔨 Pošli kladivo'], ['axe', '🪓 Hoď sekeru'], ['pass', '🔨➜ Kladivo Thorovi'], ['passAxe', '🪓➜ Sekera Thorovi'], ['callHammer', '🧲 Přivolat kladivo'], ['callAxe', '🧲 Přivolat sekeru']],
-  thor: [['axe', '🪓 Hoď sekeru'], ['hammer', '🔨 Hoď kladivo'], ['pass', '🔨➜ Kladivo Kapitánovi'], ['passAxe', '🪓➜ Sekera Kapitánovi'], ['callHammer', '🧲 Přivolat kladivo'], ['callAxe', '🧲 Přivolat sekeru'], ['bolts', '⚡ Blesky z nebe']],
-  spidey: [['swing', '🕸️ Zhoupni se nad lidmi'], ['web', '🕷️ Vystřel síť']],
-  hulk: [['smash', '👊 SMASH'], ['leap', '🦘 Skok do davu']],
+  iron: [['fly', '🚀 Let'], ['shoot', '💥 Střílej']],
+  cap: [['hammer', '🔨 Hoď'], ['axe', '🪓 Hoď'], ['pass', '🔨➜ Thor'], ['passAxe', '🪓➜ Thor'], ['callHammer', '🔨 Ke mně'], ['callAxe', '🪓 Ke mně']],
+  thor: [['axe', '🪓 Hoď'], ['hammer', '🔨 Hoď'], ['pass', '🔨➜ Kapitán'], ['passAxe', '🪓➜ Kapitán'], ['callHammer', '🔨 Ke mně'], ['callAxe', '🪓 Ke mně'], ['bolts', '⚡ Blesky']],
+  spidey: [['swing', '🕸️ Zhoupni se'], ['web', '🕷️ Síť']],
+  hulk: [['smash', '👊 SMASH'], ['leap', '🦘 Skok']],
 };
 const glow = (inner, outer) => { const c = document.createElement('canvas'); c.width = c.height = 64; const g = c.getContext('2d'); const gr = g.createRadialGradient(32, 32, 0, 32, 32, 32); gr.addColorStop(0, inner); gr.addColorStop(0.4, outer); gr.addColorStop(1, 'rgba(0,0,0,0)'); g.fillStyle = gr; g.fillRect(0, 0, 64, 64); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; return t; };
 const label = (text, color) => { const c = document.createElement('canvas'); c.width = 512; c.height = 96; const g = c.getContext('2d'); g.font = '900 54px "Russo One", sans-serif'; g.textAlign = 'center'; g.textBaseline = 'middle'; g.shadowColor = color; g.shadowBlur = 16; g.fillStyle = '#fff'; g.fillText(text, 256, 50, 500); const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: t, transparent: true, depthWrite: false })); s.scale.set(3.4, 0.64, 1); return s; };
@@ -46,7 +46,7 @@ export class Avengers {
 
   /* ---------- hrdinové ---------- */
   summon() {
-    this.openPanel();
+    this.tab = 'hero'; this.openPanel();
     if (this.heroes.length) { this.G.toast?.('Avengers už jsou na pódiu'); return; }
     const sc = this.G.scene, g = this.p.group;
     this.fxT = glow('rgba(255,255,255,1)', 'rgba(120,200,255,.7)');
@@ -223,7 +223,7 @@ export class Avengers {
 
   /* ---------- hvězdná brána ---------- */
   toggleGate() {
-    this.openPanel();
+    this.tab = 'gate'; this.openPanel();
     if (!this.gate) this.buildGate();
     const g = this.gate;
     if (g.st === 'down' || g.st === 'lower') { g.st = 'rise'; this.G.toast?.('🌀 Hvězdná brána vyjíždí z pódia'); }
@@ -266,13 +266,13 @@ export class Avengers {
 
   /* ---------- schody ze Stage 2, lidé lezou na pódia, všichni bránou ---------- */
   toggleStairs() {
-    this.openPanel();
+    this.tab = 'gate'; this.openPanel();
     const P = this.p, RW = P.RW;
     if (!P.stage2) { P.toggleStage2(); P.syncStage2?.(); }
     if (!this.stairs) {
       this.stairs = { list: [], k: 0, on: false };
       const dark = new THREE.MeshStandardMaterial({ color: '#111116', roughness: 0.7 }), neon = new THREE.MeshBasicMaterial({ color: '#39ff14' });
-      for (const sf of [12, 24]) for (const side of [-1, 1]) {
+      for (const sf of [8, 17.5, 24, 30]) for (const side of [-1, 1]) { // 4 schodiště na každé straně mola
         const sg = new THREE.Group();
         for (let k = 0; k < 6; k++) { const hgt = 1.8 - (k + 1) * 0.28, st = new THREE.Mesh(new THREE.BoxGeometry(2.4, hgt, 0.5), dark); st.position.set(0, hgt / 2, 0.25 + k * 0.5); sg.add(st); const ed = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.04, 0.05), neon); ed.position.set(0, hgt + 0.02, 0.48 + k * 0.5); sg.add(ed); }
         const [x, z] = this.W(sf, side * RW.w / 2); sg.position.set(x, P.gy, z); sg.rotation.y = P.FACE + (side > 0 ? Math.PI / 2 : -Math.PI / 2); sg.scale.z = 0.001; sg.visible = false; P.group.add(sg);
@@ -302,7 +302,7 @@ export class Avengers {
     if (!S.queue) { // kdo je nejblíž schodům, leze první
       S.queue = this.p.people.filter((q) => !q.bar && !q.st && !q.gone && !this.p.crowd.dead[q.i]).map((q) => [q, this.nearStair(q.x, q.z)[1]]).sort((a, b) => a[1] - b[1]).slice(0, S.spots.length + 60).map((e) => e[0]);
     }
-    S.wait = 0.12;
+    S.wait = 0.055;
     const q = S.queue.shift(); if (!q || q.st || this.p.crowd.dead[q.i]) return;
     const [f, r] = S.spots[S.next++], [x, z] = this.pos(q), [s] = this.nearStair(x, z), lane = s.side * (Math.abs(r) < 2.4 ? Math.abs(r) : 1.6);
     const path = [[...this.W(s.f + (Math.random() - 0.5) * 1.4, s.side * 5.9), this.p.gy], [...this.W(s.f, s.side * 2.4), this.top], [...this.W(s.f, lane), this.top]];
@@ -402,12 +402,14 @@ export class Avengers {
       if (H.faceA != null && H.armT > 0) H.h = H.faceA;
       H.m.rotation.y = H.h;
       if (H.flying) { H.m.rotation.x = Math.min(0.9, (H.fspeed || 0) * 0.08); mode = 'air'; } else H.m.rotation.x = 0;
+      if (H.rotX != null) H.m.rotation.x = H.rotX;
       animateHuman(H.m, speed, dt, mode);
       const b = H.b;
       if (H.armT > 0) { if (b.uaR) b.uaR.rotation.x -= 2.6 * Math.sin((H.armT / 0.5) * Math.PI); } // hod / výstřel
       else if (singer === H && dance) { if (b.uaL) b.uaL.rotation.x -= 2.3; if (b.uaR) b.uaR.rotation.x -= 1.0 + Math.abs(Math.sin(beatF * Math.PI)) * 1.2; }
       else if (dance && H.id === 'hulk') { if (b.uaL) b.uaL.rotation.x -= 0.6 + bounce * 6; if (b.uaR) b.uaR.rotation.x -= 0.6 + bounce * 6; }
       if (H.swing && b.uaR) { b.uaR.rotation.x -= 2.9; }
+      if (H.axeUp && H.cine && b.uaR) b.uaR.rotation.x -= 2.9; // sekera nad hlavou
       H.m.updateMatrixWorld(true);
       // doplňky kostýmu a jmenovka
       const sy = Math.sin(H.h), cy = Math.cos(H.h);
@@ -526,7 +528,7 @@ export class Avengers {
   }
 
   /* ---------- DOOM ---------- */
-  toggleDoom() { this.openPanel(); if (this.doom) this.endDoom(false); else this.startDoom(); this.renderPanel(); }
+  toggleDoom() { this.tab = 'doom'; this.openPanel(); if (this.doom) this.endDoom(false); else this.startDoom(); this.renderPanel(); }
   startDoom() {
     const P = this.p, G = this.G, RW = P.RW, L = P.rw?.L || 0;
     const [x, z] = L > 3 ? this.W(RW.f0 + L - 1.6, 0) : this.W(3.2, 0), y = this.floorY(x, z);
@@ -623,6 +625,7 @@ export class Avengers {
   vsDoom(H, dt) {
     const D = this.doom, tp = this.doomPos(), dx = D.x - H.x, dz = D.z - H.z, d = Math.hypot(dx, dz) || 1;
     const want = { hulk: 9, cap: 11, thor: 13, spidey: 10, iron: 12 }[H.id];
+    if (H.id === 'thor' && (H.cine || !D.thorDone)) { this.thorCine(H, dt); return; }
     if (H.stun > 0) return;
     H.h = Math.atan2(dx, dz);
     if (H.id === 'iron') { H.flying = true; H.y += (D.cy + 7 - H.y) * Math.min(1, dt * 1.5); H.fa = (H.fa || 0) + dt * 0.7; const ox = D.x + Math.cos(H.fa) * want, oz = D.z + Math.sin(H.fa) * want, ex = ox - H.x, ez = oz - H.z, ed = Math.hypot(ex, ez) || 1, sp = Math.min(ed * 2, 13); H.x += (ex / ed) * sp * dt; H.z += (ez / ed) * sp * dt; H.fspeed = sp * 0.4; }
@@ -633,6 +636,51 @@ export class Avengers {
     else if (H.id === 'thor') { if (!this.storm && Math.random() < 0.5) this.act('thor', 'bolts', tp); else if (!this.act('thor', 'axe', tp)) this.act('thor', 'hammer', tp); H.cool = 2.8; }
     else if (H.id === 'iron') { this.act('iron', 'shoot', tp); H.cool = 1.1; }
     else if (H.id === 'spidey') { const from = new THREE.Vector3(H.x, H.y + 1.5, H.z); this.beam(from, new THREE.Vector3(tp.x, tp.y, tp.z), '#ffffff'); this.hitDoom(6, H); H.armT = 0.4; H.faceA = H.h; H.cool = 1.6; }
+  }
+  /**
+   * Thorův útok na Dooma (filmová scéna): nabije se blesky, pomalu letí přes celou Stage 2 se sekerou nad hlavou,
+   * Doom ho zvednutou rukou zastaví kousek od své hlavy a odhodí přes dav do pravého baru (při pohledu z pódia dolů).
+   */
+  thorCine(H, dt) {
+    const D = this.doom, P = this.p, G = this.G, RW = P.RW, L = P.rw?.L || 0;
+    if (!H.cine) {
+      D.thorDone = true; const [sx, sz] = L > 6 ? this.W(RW.f0 + 0.8, 0) : this.W(1.5, 0);
+      H.cine = { ph: 'back', t: 0, sx, sz }; H.path = []; H.jump = null; H.swing = null; H.lie = false;
+      if (this.axe.holder !== 'thor' || this.axe.fly) { this.axe.fly = null; this.axe.holder = 'thor'; this.axe.obj.visible = true; } // sekeru má celou dobu v ruce
+      this.renderPanel();
+    }
+    const Cn = H.cine; Cn.t += dt; H.flying = true; H.fspeed = 0; H.walking = false;
+    const hx = D.x, hz = D.z, hy = D.cy + 1.76 * D.scale * 0.72; // Doomova hlava
+    if (Cn.ph === 'back') { // přesun na začátek mola
+      const dx = Cn.sx - H.x, dz = Cn.sz - H.z, d = Math.hypot(dx, dz), fl = this.floorY(Cn.sx, Cn.sz);
+      if (d > 0.4) { const st = Math.min(d, 16 * dt); H.x += (dx / d) * st; H.z += (dz / d) * st; H.h = Math.atan2(dx, dz); H.y += (fl + 1.5 - H.y) * Math.min(1, dt * 4); H.fspeed = 5; }
+      else { Cn.ph = 'charge'; Cn.t = 0; H.y = fl; this.storm = { t: 0, T: 99, who: H, tp: null }; G.audio?.noise?.(1.5, 0.6, 150); }
+    } else if (Cn.ph === 'charge') { // sekera nad hlavu, blesky do něj
+      H.h = Math.atan2(hx - H.x, hz - H.z); H.axeUp = true; H.y += Math.sin(Cn.t * 30) * 0.004;
+      if (Cn.t > 1.4) { Cn.ph = 'fly'; Cn.t = 0; Cn.x0 = H.x; Cn.y0 = H.y; Cn.z0 = H.z; const a = Math.atan2(H.x - hx, H.z - hz); Cn.x1 = hx + Math.sin(a) * 1.25; Cn.z1 = hz + Math.cos(a) * 1.25; Cn.y1 = hy - 1.76 * H.scale * 0.78; Cn.T = Math.max(3.5, Math.min(8, Math.hypot(Cn.x1 - H.x, Cn.z1 - H.z) / 4.2)); }
+    } else if (Cn.ph === 'fly') { // pomalý let obloukem, kolem něj blesky
+      const a = Math.min(1, Cn.t / Cn.T), e = a * a * (3 - 2 * a);
+      H.x = Cn.x0 + (Cn.x1 - Cn.x0) * e; H.z = Cn.z0 + (Cn.z1 - Cn.z0) * e; H.y = Cn.y0 + (Cn.y1 - Cn.y0) * e + Math.sin(a * Math.PI) * 6.5;
+      H.h = Math.atan2(hx - H.x, hz - H.z); H.fspeed = 7; H.axeUp = true; D.lookA = Math.atan2(H.x - hx, H.z - hz);
+      if (a > 0.8) D.raise = true; // Doom zvedá ruku
+      if (a >= 1) { Cn.ph = 'hold'; Cn.t = 0; if (this.storm) this.storm.T = 0; this.thunder?.(0.9); G.audio?.blip?.(90, 0.8, 'sawtooth', 0.2, 40); }
+    } else if (Cn.ph === 'hold') { // zastaven myšlenkou 20 cm od hlavy
+      H.x = Cn.x1 + (Math.random() - 0.5) * 0.03; H.z = Cn.z1 + (Math.random() - 0.5) * 0.03; H.y = Cn.y1 + Math.sin(Cn.t * 3) * 0.04; H.fspeed = 7; H.axeUp = true; D.raise = true;
+      if ((Cn.fx = (Cn.fx || 0) - dt) <= 0) { Cn.fx = 0.16; this.flash(H.x, H.y + 1.3, H.z, 4.5, '#39ff14'); const hand = D.b.fistR ? D.b.fistR.getWorldPosition(new THREE.Vector3()) : new THREE.Vector3(hx, hy, hz); this.beam(hand, new THREE.Vector3(H.x, H.y + 1.4, H.z), '#39ff14'); }
+      if (Cn.t > 2.2) { // odhození do pravého baru
+        const B = P.bars?.[0]; Cn.ph = 'thrown'; Cn.t = 0; Cn.x0 = H.x; Cn.y0 = H.y; Cn.z0 = H.z;
+        Cn.x1 = B ? B.cx + B.dx * 1.1 : H.x + Math.sin(P.FACE - Math.PI / 2) * 22; Cn.z1 = B ? B.cz + B.dz * 1.1 : H.z + Math.cos(P.FACE - Math.PI / 2) * 22; Cn.y1 = G.city.ground(Cn.x1, Cn.z1) + 0.35;
+        Cn.T = Math.hypot(Cn.x1 - H.x, Cn.z1 - H.z) / 30; H.axeUp = false; this.flash(H.x, H.y + 1.2, H.z, 10, '#39ff14'); G.audio?.noise?.(0.5, 0.7, 500); this.thunder?.(1);
+      }
+    } else if (Cn.ph === 'thrown') { // letí přes dav, zastaví se až o bar
+      const a = Math.min(1, Cn.t / Cn.T);
+      H.x = Cn.x0 + (Cn.x1 - Cn.x0) * a; H.z = Cn.z0 + (Cn.z1 - Cn.z0) * a; H.y = Cn.y0 + (Cn.y1 - Cn.y0) * a + Math.sin(a * Math.PI) * 2.5;
+      H.h = Math.atan2(Cn.x0 - Cn.x1, Cn.z0 - Cn.z1); H.rotX = -Cn.t * 14; D.raise = a < 0.5;
+      if (a >= 1) { Cn.ph = 'down'; Cn.t = 0; H.rotX = -Math.PI / 2; H.y = Cn.y1; D.raise = false; D.lookA = null; for (let k = 0; k < 6; k++) this.flash(H.x + (Math.random() - 0.5) * 4, H.y + Math.random() * 2, H.z + (Math.random() - 0.5) * 4, 4 + Math.random() * 5, k % 2 ? '#ffd27a' : '#ffffff'); G.audio?.noise?.(0.9, 0.9, 260); G.audio?.noise?.(0.5, 0.6, 2500); G.shake = Math.max(G.shake || 0, 0.6); G.toast?.('💥 Doom odhodil Thora do baru!'); }
+    } else if (Cn.ph === 'down') { // leží u baru, pak se zvedne a bojuje dál
+      H.rotX = -Math.PI / 2;
+      if (Cn.t > 5) { H.rotX = null; H.cine = null; H.flying = false; H.cool = 1.5; this.renderPanel(); }
+    }
   }
   updateDoom(dt) {
     const G = this.G;
@@ -651,6 +699,8 @@ export class Avengers {
     animateHuman(D.m, 0, dt, D.st === 'stand' ? null : 'air');
     if (D.b.uaL) D.b.uaL.rotation.z -= 0.5; if (D.b.uaR) D.b.uaR.rotation.z += 0.5;
     if (D.hitT > 0 && D.b.uaR) D.b.uaR.rotation.x -= 2.2;
+    if (D.raise && D.b.uaR) D.b.uaR.rotation.x -= 1.9; // zvednutá ruka: zastavuje Thora
+    if (D.lookA != null) D.m.rotation.y += Math.atan2(Math.sin(D.lookA - D.m.rotation.y), Math.cos(D.lookA - D.m.rotation.y)) * Math.min(1, dt * 4);
     D.m.updateMatrixWorld(true);
     const h = D.m.rotation.y, sy = Math.sin(h), cy = Math.cos(h), s = D.scale, py = D.m.position.y;
     const at = (o, bone, ox, oy, oz, fy) => { if (D.b[bone]) D.b[bone].getWorldPosition(V); else V.set(D.x, py + fy * s, D.z); o.position.set(V.x + (cy * ox + sy * oz) * s, V.y + oy * s, V.z + (-sy * ox + cy * oz) * s); o.rotation.y = h; };
@@ -681,7 +731,7 @@ export class Avengers {
     P.doom = false; if (G.audio?.master) G.audio.master.gain.value = this._gain ?? 0.5;
     D.light.intensity = 0; if (P.music) P.music.volume = this._vol ?? 0.95; this.doomMusic(false); for (const B of D.bolts || []) B.l.visible = false;
     if (this._music && P.music && !hard) P.music.play().catch(() => {});
-    for (const H of this.heroes) { if (H.vs) { H.vs = null; H.flying = false; if (!H.gone && this.ctrl !== H) { H.home = 'stage'; this.route(H, this.W(3.3, H.r)); } } }
+    for (const H of this.heroes) { if (H.cine) { H.cine = null; H.rotX = null; H.axeUp = false; if (this.storm) this.storm.T = 0; } if (H.vs) { H.vs = null; H.flying = false; if (!H.gone && this.ctrl !== H) { H.home = 'stage'; this.route(H, this.W(3.3, H.r)); } } }
     if (beaten) { for (let k = 0; k < 9; k++) this.flash(D.x + (Math.random() - 0.5) * 5, D.cy + 1 + Math.random() * 3, D.z + (Math.random() - 0.5) * 5, 8 + Math.random() * 10, k % 2 ? '#39ff14' : '#ffffff'); G.audio?.noise?.(1.6, 0.9, 110); G.toast?.('💥 DOOM je poražen! Světla a hudba se vracejí.'); }
     else if (!hard) G.toast?.('Doom odlétá – světla a hudba se vracejí');
     if (hard) { G.scene.remove(D.m); P.group.remove(D.g); this.doom = null; G.darkK = 1; }
@@ -694,14 +744,15 @@ export class Avengers {
     if (this.pnl) { this.pnl.classList.remove('collapsed'); return; }
     if (!document.getElementById('av-css')) {
       const css = document.createElement('style'); css.id = 'av-css';
-      css.textContent = `#av-panel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(58px + env(safe-area-inset-bottom));z-index:43;width:min(640px,96vw);max-height:46vh;overflow:auto;background:rgba(8,8,14,.92);border:1px solid rgba(255,45,85,.55);border-radius:14px;padding:8px 10px;font:700 12px "Chakra Petch",sans-serif;color:#fff;pointer-events:auto}
-#av-panel h3{margin:0 0 6px;font:400 14px "Bungee",sans-serif;color:#ff5c7a;display:flex;justify-content:space-between;align-items:center}
-#av-panel .r{display:flex;flex-wrap:wrap;gap:5px;align-items:center;margin-top:5px}#av-panel .r>span{opacity:.7;font-size:11px;min-width:54px}
-#av-panel button{font:700 12px "Chakra Petch",sans-serif;color:#e6e8ee;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);border-radius:8px;padding:6px 9px;cursor:pointer}
+      css.textContent = `#av-panel{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(52px + env(safe-area-inset-bottom));z-index:43;width:max-content;max-width:min(560px,96vw);background:rgba(8,8,14,.9);border:1px solid rgba(255,45,85,.5);border-radius:11px;padding:5px 7px;font:700 11px "Chakra Petch",sans-serif;color:#fff;pointer-events:auto}
+#av-panel h3{margin:0;display:flex;justify-content:space-between;align-items:center;gap:8px;font-size:11px;line-height:1.2;font-weight:700}#av-panel .tabs{display:flex;gap:3px}
+#av-panel .r{display:flex;flex-wrap:wrap;gap:3px;align-items:center;margin-top:4px}#av-panel .r>span{opacity:.7;font-size:10px}#av-panel .info{margin-left:4px}
+#av-panel button{font:700 11px "Chakra Petch",sans-serif;color:#e6e8ee;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:6px;padding:3px 6px;cursor:pointer;white-space:nowrap}
+#av-panel button.tb{border-radius:6px 6px 0 0;border-bottom-color:transparent;opacity:.7}#av-panel button.tb.on{opacity:1}
 #av-panel button.on{background:linear-gradient(90deg,rgba(255,45,85,.55),rgba(255,176,0,.4));border-color:#ff5c7a;color:#fff}
 #av-panel button.go{background:#39ff14;color:#04140b;border-color:#39ff14}#av-panel button.red{background:#c4161c;border-color:#ff5c7a}
-#av-panel .x{background:none;border:0;color:#ff5c7a;font-size:16px;padding:0 4px}#av-panel.collapsed .body{display:none}#av-panel .av-count{color:#9fd8ff}
-@media (max-width:760px){#av-panel{bottom:calc(215px + env(safe-area-inset-bottom));max-height:38vh}}`;
+#av-panel .x{background:none;border:0;color:#ff5c7a;font-size:14px;padding:0 3px}#av-panel.collapsed .body{display:none}#av-panel .av-count{color:#9fd8ff}
+@media (max-width:760px){#av-panel{bottom:calc(215px + env(safe-area-inset-bottom))}}`;
       document.head.appendChild(css);
     }
     const d = document.createElement('div'); d.id = 'av-panel'; document.body.appendChild(d); this.pnl = d;
@@ -711,6 +762,7 @@ export class Avengers {
       const b = e.target.closest('button'); if (!b) return; const D = b.dataset;
       if (D.x === 'min') { d.classList.toggle('collapsed'); return; }
       if (D.x === 'close') { d.remove(); this.pnl = null; return; }
+      if (D.tab) { this.tab = D.tab; d.classList.remove('collapsed'); this.renderPanel(); return; }
       if (D.sum) this.summon();
       if (D.sel) { this.sel = D.sel; this.renderPanel(); }
       if (D.aim) { this.aim = +D.aim; this.renderPanel(); }
@@ -729,22 +781,30 @@ export class Avengers {
     const d = this.pnl; if (!d) return;
     const live = this.heroes.filter((h) => !h.gone), on = (c) => (c ? ' class="on"' : '');
     if (live.length && !this.hero(this.sel)) this.sel = live[0].id;
-    const gs = this.gate?.st, gOpen = gs === 'open', gUp = gs && gs !== 'down' && gs !== 'lower';
-    let h = `<h3>🦸 Avengers &amp; 🌀 Hvězdná brána <span><button class="x" data-x="min">–</button><button class="x" data-x="close">✕</button></span></h3><div class="body">`;
-    if (!live.length) h += `<div class="r"><button class="go" data-sum="1">🦸 Zavolat Avengers na pódium</button></div>`;
-    else {
-      const H = this.hero(this.sel), holder = this.hero(this.hammer.holder)?.name || '—';
-      h += `<div class="r"><span>Hrdina</span>${live.map((x) => `<button data-sel="${x.id}"${on(x.id === this.sel)}>${x.name}${this.ctrl === x ? ' 🎮' : ''}</button>`).join('')}</div>`;
-      h += `<div class="r"><span>${H.name}</span>${ABIL[H.id].map(([a, l]) => `<button data-act="${a}">${l}</button>`).join('')}<button data-pos="1"${on(this.ctrl === H)}>${this.ctrl === H ? '🎮 Pustit (L)' : '🎮 Ovládat sám'}</button></div>`;
-      h += `<div class="r"><span>Směr hodu</span>${[[1.0, '⬅'], [0.5, '↖'], [0, '⬆ rovně'], [-0.5, '↗'], [-1.0, '➡']].map(([a, l]) => `<button data-aim="${a}"${on(Math.abs(this.aim - a) < 0.01)}>${l}</button>`).join('')}<span style="min-width:0">🔨 má: ${holder}</span></div>`;
-      h += `<div class="r"><span>Duel</span><button data-cmd="duel">🔨🪓 Jen Kapitán + Thor na molo</button><span style="min-width:0">🪓 má: ${this.hero(this.axe.holder)?.name || '—'}</span></div>`;
-      h += `<div class="r"><span>Všichni</span><button data-cmd="stage2">Na STAGE 2</button><button data-cmd="stage">Zpět na pódium</button><button data-cmd="sing"${on(this.sing)}>🎤 Zpívat</button><button data-cmd="attack" class="${this.attack ? 'on' : 'red'}">${this.attack ? '⏹ Zastavit útok' : '⚔️ ÚTOK NA LIDI'}</button></div>`;
+    const gs = this.gate?.st, gOpen = gs === 'open', gUp = gs && gs !== 'down' && gs !== 'lower', dm = this.doom;
+    const tab = this.tab || 'hero', tb = (k, l) => `<button class="tb${tab === k ? ' on' : ''}" data-tab="${k}">${l}</button>`;
+    let h = `<h3><span class="tabs">${tb('hero', '🦸 Hrdina')}${tb('team', '👥 Všichni')}${tb('gate', '🌀 Brána')}${tb('doom', '☠ Doom')}</span><span><button class="x" data-x="min">–</button><button class="x" data-x="close">✕</button></span></h3><div class="body">`;
+    const call = `<div class="r"><button class="go" data-sum="1">🦸 Zavolat Avengers</button></div>`;
+    if (tab === 'hero') {
+      if (!live.length) h += call;
+      else {
+        const H = this.hero(this.sel);
+        h += `<div class="r">${live.map((x) => `<button data-sel="${x.id}"${on(x.id === this.sel)}>${x.name.replace('Kapitán Amerika', 'Kapitán')}${this.ctrl === x ? ' 🎮' : ''}</button>`).join('')}</div>`;
+        h += `<div class="r">${ABIL[H.id].map(([a, l]) => `<button data-act="${a}">${l}</button>`).join('')}</div>`;
+        h += `<div class="r"><span>Směr</span>${[[1.0, '⬅'], [0.5, '↖'], [0, '⬆'], [-0.5, '↗'], [-1.0, '➡']].map(([a, l]) => `<button data-aim="${a}"${on(Math.abs(this.aim - a) < 0.01)}>${l}</button>`).join('')}<button data-pos="1"${on(this.ctrl === H)}>${this.ctrl === H ? '🎮 Pustit (L)' : '🎮 Ovládat'}</button><span class="info">🔨 ${this.hero(this.hammer.holder)?.name.split(' ')[0] || '—'} · 🪓 ${this.hero(this.axe.holder)?.name.split(' ')[0] || '—'}</span></div>`;
+      }
+    } else if (tab === 'team') {
+      if (!live.length) h += call;
+      else h += `<div class="r"><button data-cmd="stage2">Na STAGE 2</button><button data-cmd="stage">Na pódium</button><button data-cmd="duel">🔨🪓 Duel Kapitán + Thor</button><button data-cmd="sing"${on(this.sing)}>🎤 Zpívat</button><button data-cmd="attack" class="${this.attack ? 'on' : 'red'}">${this.attack ? '⏹ Stop útok' : '⚔️ ÚTOK NA LIDI'}</button></div>`;
+    } else if (tab === 'gate') {
+      h += `<div class="r"><button data-gate="1"${on(gUp)}>${gUp ? '🌀 Zavřít bránu' : '🌀 STARGATE'}</button>${live.length ? `<button data-cmd="leave">Avengers pryč</button>` : ''}<button data-cmd="rapLeave">Rappeři pryč</button></div>`;
+      h += `<div class="r"><button data-stairs="1"${on(this.stairs?.on)}>🪜 Schody</button><button data-exo="1"${on(this.exodus)}>🌀 Všichni bránou</button><span class="info av-count">${this.exodus ? `Bránou prošlo ${this.goneN} lidí` : gOpen ? 'brána otevřená' : ''}</span></div>`;
+    } else {
+      h += `<div class="r"><button data-doom="1" class="${dm ? 'on' : 'red'}">${dm ? '☠ Doom odletí' : '☠ DOOM'}</button>${dm ? `<span class="info av-doom" style="color:#39ff14">DOOM ❤ ${Math.max(0, Math.ceil(dm.hp))}</span>` : ''}</div>`;
+      if (dm && dm.st === 'stand' && live.length) h += `<div class="r"><span>Útok</span>${live.map((x) => `<button data-vs="${x.id}"${on(!!x.vs)}>${x.name.replace('Kapitán Amerika', 'Kapitán')}</button>`).join('')}<button data-vs="all" class="go">Všichni</button></div>`;
+      else if (dm && !live.length) h += call;
     }
-    h += `<div class="r"><span>Brána</span><button data-gate="1"${on(gUp)}>${gUp ? '🌀 Zavřít bránu' : '🌀 STARGATE'}</button>${live.length ? `<button data-cmd="leave">Avengers bránou pryč</button>` : ''}<button data-cmd="rapLeave">Rappeři bránou pryč</button></div>`;
-    const dm = this.doom;
-    h += `<div class="r"><span>DOOM</span><button data-doom="1" class="${dm ? 'on' : 'red'}">${dm ? '☠ Doom odletí' : '☠ DOOM'}</button>${dm && dm.st === 'stand' && live.length ? `<span style="min-width:0">Útok na Dooma:</span>${live.map((x) => `<button data-vs="${x.id}"${on(!!x.vs)}>${x.name}</button>`).join('')}<button data-vs="all" class="go">Všichni</button>` : ''}${dm ? `<span class="av-doom" style="min-width:0;color:#39ff14">DOOM ❤ ${Math.max(0, Math.ceil(dm.hp))}</span>` : ''}</div>`;
-    h += `<div class="r"><span>Lidé</span><button data-stairs="1"${on(this.stairs?.on)}>🪜 Schody ze STAGE 2</button><button data-exo="1"${on(this.exodus)}>🌀 Všichni bránou</button><span class="av-count" style="min-width:0">${this.exodus ? `Bránou prošlo ${this.goneN} lidí` : gOpen ? 'brána otevřená' : ''}</span></div></div>`;
-    d.innerHTML = h;
+    d.innerHTML = h + '</div>';
   }
   clearHeroes() {
     const sc = this.G.scene, g = this.p.group;
