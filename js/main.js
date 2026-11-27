@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127134447';
-import { buildWorld } from './world.js?v=20261127134447';
-import { loadModels } from './models.js?v=20261127134447';
-import { Game } from './game.js?v=20261127134447';
-import { Hud } from './hud.js?v=20261127134447';
-import { Input } from './input.js?v=20261127134447';
-import { PrisonFX } from './prisonfx.js?v=20261127134447';
-import { Audio } from './audio.js?v=20261127134447';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127134447';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127135404';
+import { buildWorld } from './world.js?v=20261127135404';
+import { loadModels } from './models.js?v=20261127135404';
+import { Game } from './game.js?v=20261127135404';
+import { Hud } from './hud.js?v=20261127135404';
+import { Input } from './input.js?v=20261127135404';
+import { PrisonFX } from './prisonfx.js?v=20261127135404';
+import { Audio } from './audio.js?v=20261127135404';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127135404';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -301,7 +301,7 @@ async function run(city, progress) {
     if (input.hit('KeyT')) { if (hud.teleportOpen) hud.closeTeleport(); else hud.openTeleport(game); }
     if (input.hit('KeyN')) { if (hud.teleportOpen) hud.closeTeleport(); else hud.openNav(game); }
     if (input.hit('KeyR')) game.restart();
-    if (input.hit('KeyP')) cycleTime();
+    if (input.hit('KeyP') && !game.handleP()) cycleTime(); // P: katapultáž / padák, jinak denní doba
     if (input.hit('KeyJ')) game.toggleJetpack();
     if (input.hit('Escape')) { hud.closeBigMap(); hud.closeTeleport(); $('controls').hidden = true; }
     paused = hud.bigMapOpen || hud.teleportOpen;

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127134447';
-import { PrisonLife } from './prison.js?v=20261127134447';
-import { Weapons } from './weapons.js?v=20261127134447';
-import { PrisonFX } from './prisonfx.js?v=20261127134447';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127134447';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127135404';
+import { PrisonLife } from './prison.js?v=20261127135404';
+import { Weapons } from './weapons.js?v=20261127135404';
+import { PrisonFX } from './prisonfx.js?v=20261127135404';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127135404';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -350,6 +350,7 @@ export class Game {
     else if (this.mode === 'jet') this.updateJet(dt);
     else if (this.mode === 'trolley') this.updateRide(dt);
 
+    this.updateFallingAircraft(dt);
     if (inp.hit('KeyE')) this.handleE();
 
     this.updateTraffic(dt);
@@ -381,6 +382,7 @@ export class Game {
     if (swimming) sp *= 0.45;
     const flying = this.jetpack && P.y > city.roofHeight(P.x, P.z, P.y + 0.6) + 0.3;
     if (flying && ml > 0.05) sp = 13 * Math.min(1, ml); // jetpack: ve vzduchu rychleji (Shift tu znamená klesání)
+    if (this.chute && ml > 0.05) sp = Math.max(sp, 7 * Math.min(1, ml)); // padák: klouzavý let
     if (ml > 0.05) {
       mx /= ml; mz /= ml;
       P.h += wrapAngle(Math.atan2(mx, mz) - P.h) * Math.min(1, dt * 12);
@@ -406,11 +408,14 @@ export class Game {
       if (inp.hit('Space') && P.y <= floor + 0.05 && !swimming) P.vy = 5.2;
       P.vy -= 15 * dt;
     }
+    if (this.chute) P.vy = Math.max(P.vy, -4.2); // otevřený padák brzdí pád
     P.y += P.vy * dt;
     if (P.y <= floor) {
       if (P.vy < -14 && !this.jetpack) this.hurt((-P.vy - 14) * 6, 'pád');
       P.y = floor; P.vy = Math.max(0, thrust ? P.vy : 0);
+      if (this.chute) this.closeChute(true);
     }
+    this.updateChute(dt);
     this.updateJetpackFx(dt, thrust);
     // srážka s vozidly
     for (const v of this.allVehicles()) {
@@ -430,6 +435,108 @@ export class Game {
     m.rotation.y = P.h;
     animateHuman(m, sp, dt, P.y > floor + 0.25 ? 'air' : null);
     this.hud.setSpeed(null);
+  }
+
+  /**
+   * P: ze stíhačky / vrtulníku katapultáž, ve vzduchu otevře (nebo odhodí) padák.
+   * Vrací false, když P nemá co dělat (pak P mění denní dobu).
+   */
+  handleP() {
+    if (this.mode === 'jet' || this.mode === 'heli') { this.eject(); return true; }
+    if (this.mode !== 'foot') return false;
+    const P = this.player, floor = this.city.roofHeight(P.x, P.z, P.y + 0.6);
+    if (this.chute) { this.closeChute(false); this.toast('Padák odhozen'); return true; }
+    if (P.y > floor + 2.5) { this.openChute(); return true; }
+    return false;
+  }
+  eject() {
+    const v = this.vehicle, P = this.player;
+    this.vehicle = null; this.mode = 'foot';
+    v.driver = null;
+    if (v.kind === 'jet') v.mesh.userData.flameM.opacity = 0;
+    v.falling = true; v.fallVy = v.kind === 'jet' ? Math.sin(v.pitch || 0) * (v.spd || 0) : (v.vy || 0);
+    Object.assign(P, { x: v.x, z: v.z, y: v.y + 3.5, vy: 7, h: v.h });
+    P.mesh.visible = true;
+    this.audio.door(); this.audio?.blip?.(220, 0.3, 'sawtooth', 0.08, 300);
+    this.toast('Katapultáž! P = otevřít padák · J = jetpack');
+  }
+  openChute() {
+    if (!this.chuteMesh) {
+      const g = new THREE.Group();
+      const c = document.createElement('canvas'); c.width = 256; c.height = 32;
+      const cg = c.getContext('2d');
+      for (let k = 0; k < 8; k++) { cg.fillStyle = k % 2 ? '#f4f1ea' : '#e2541b'; cg.fillRect(k * 32, 0, 32, 32); }
+      const tex = new THREE.CanvasTexture(c); tex.colorSpace = THREE.SRGBColorSpace;
+      const canopy = new THREE.Mesh(new THREE.SphereGeometry(3.6, 24, 8, 0, Math.PI * 2, 0, Math.PI / 2.4), new THREE.MeshStandardMaterial({ map: tex, side: THREE.DoubleSide, roughness: 0.8 }));
+      canopy.scale.set(1, 0.42, 0.75); canopy.position.y = 6.2; canopy.castShadow = true;
+      g.add(canopy);
+      const lineM = new THREE.MeshBasicMaterial({ color: '#333333' });
+      for (let k = 0; k < 10; k++) {
+        const a = (k / 10) * Math.PI * 2, top = new THREE.Vector3(Math.cos(a) * 3.3, 6.0, Math.sin(a) * 3.3 * 0.75), bot = new THREE.Vector3(0, 1.5, 0);
+        const d = top.clone().sub(bot), L = d.length();
+        const ln = new THREE.Mesh(new THREE.CylinderGeometry(0.012, 0.012, L, 3), lineM);
+        ln.position.copy(bot).addScaledVector(d, 0.5);
+        ln.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), d.normalize());
+        g.add(ln);
+      }
+      this.chuteMesh = g;
+      this.scene.add(g);
+    }
+    this.chute = true; this.chuteT = 0;
+    this.chuteMesh.visible = true;
+    this.audio?.noise?.(0.4, 0.4, 900);
+    this.toast('🪂 Padák otevřen · WASD řízení · J = jetpack · P = odhodit');
+  }
+  closeChute(landed) {
+    this.chute = false;
+    if (this.chuteMesh) this.chuteMesh.visible = false;
+    if (landed) this.toast('Přistál jsi');
+  }
+  updateChute(dt) {
+    if (!this.chute || !this.chuteMesh) return;
+    const P = this.player, m = this.chuteMesh;
+    this.chuteT += dt;
+    const k = Math.min(1, 0.15 + this.chuteT * 1.6);
+    m.scale.set(k, k, k);
+    m.position.set(P.x, P.y, P.z);
+    m.rotation.y = P.h;
+    m.rotation.z = Math.sin(this.time * 1.3) * 0.05;
+  }
+  /** Stíhačka / vrtulník bez pilota padá k zemi a po dopadu vybuchne (pak se objeví zpátky ve věznici). */
+  updateFallingAircraft(dt) {
+    for (const v of [this.jet, this.heli]) {
+      if (!v || !v.falling || v.driver === 'player') continue;
+      const city = this.city;
+      v.fallVy = (v.fallVy || 0) - 9.8 * dt;
+      if (v.kind === 'jet') {
+        v.spd = Math.max(0, (v.spd || 0) - 6 * dt);
+        v.pitch = Math.max(-1.2, (v.pitch || 0) - dt * 0.4);
+        const [fx, fz] = v.forward();
+        v.x += fx * v.spd * dt; v.z += fz * v.spd * dt;
+        v.roll = (v.roll || 0) + dt * 0.8;
+        v.mesh.rotation.set(-v.pitch, v.h, v.roll, 'YXZ');
+      } else {
+        v.x += (v.vx || 0) * dt; v.z += (v.vz || 0) * dt; v.vx *= 0.99; v.vz *= 0.99;
+        v.mesh.rotation.z += dt * 0.6; v.rotor = Math.max(0, (v.rotor || 0) - dt * 0.3);
+      }
+      v.y += v.fallVy * dt;
+      v.mesh.position.set(v.x, v.y, v.z);
+      const gy = city.roofHeight(v.x, v.z, v.y + 2);
+      const hit = city.collide(v.x, v.z, 3, v.y + 1).hit;
+      if (v.y <= gy || hit) {
+        v.falling = false;
+        this.weapons?.explode(new THREE.Vector3(v.x, Math.max(v.y, gy) + 1, v.z), true);
+        this.audio.crash(40);
+        if (v.kind === 'jet') this.placePrisonJet();
+        else {
+          const S = PRISON_SPAWN;
+          v.vx = v.vz = v.vy = 0; v.rotor = 0; v.dead = false; v.hp = 100;
+          v.place(S.heli[0], S.heli[1], Math.PI / 2); v.y = city.ground(S.heli[0], S.heli[1]);
+          v.mesh.rotation.set(0, v.h, 0); v.mesh.position.set(v.x, v.y, v.z);
+        }
+        this.toast(v.kind === 'jet' ? 'Stíhačka se zřítila · nová čeká na hřišti' : 'Vrtulník se zřítil · nový čeká ve věznici');
+      }
+    }
   }
 
   /** Jetpack (raketový batoh): zapnout / vypnout. */
@@ -1382,7 +1489,7 @@ export class Game {
         const n = this.nextStop(t);
         return `<kbd>E</kbd> Nastoupit do autobusu ${t.line.ref}${n ? ' · směr ' + n.n : ''}`;
       }
-      if (this.jet && Math.hypot(this.jet.x - P.x, this.jet.z - P.z) < 8) return '<kbd>E</kbd> Nastoupit do stíhačky';
+      if (this.jet && Math.hypot(this.jet.x - P.x, this.jet.z - P.z) < 8 && Math.abs(this.jet.y - P.y) < 3) return '<kbd>E</kbd> Nastoupit do stíhačky';
       if (this.heli && Math.hypot(this.heli.x - P.x, this.heli.z - P.z) < 7) return '<kbd>E</kbd> Nastoupit do vrtulníku';
       for (const v of this.parked) if (!v.dead && Math.hypot(v.x - P.x, v.z - P.z) < 4.2) return v.owned ? `<kbd>E</kbd> Nastoupit: ${v.label}` : '<kbd>E</kbd> Vloupat se do auta';
       for (const t of this.traffic) if (Math.hypot(t.veh.x - P.x, t.veh.z - P.z) < 4.2) return '<kbd>E</kbd> Ukrást auto';
