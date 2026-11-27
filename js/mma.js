@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127195519';
-import { Crowd } from './crowd.js?v=20261127195519';
-import { PrisonFX } from './prisonfx.js?v=20261127195519';
+import { makeHuman, animateHuman } from './entities.js?v=20261127195850';
+import { Crowd } from './crowd.js?v=20261127195850';
+import { PrisonFX } from './prisonfx.js?v=20261127195850';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -38,8 +38,14 @@ export class MMA {
     for (let i = 0; i < 5000; i++) { cg.fillStyle = `rgba(0,0,0,${Math.random() * 0.03})`; cg.fillRect(Math.random() * 1024, Math.random() * 1024, 3, 3); }
     const oct = (r) => { cg.beginPath(); for (let k = 0; k <= 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; cg.lineTo(512 + Math.cos(a) * r, 512 + Math.sin(a) * r); } };
     cg.strokeStyle = '#b11d1d'; cg.lineWidth = 12; oct(480); cg.stroke();
-    cg.fillStyle = '#1b1b1b'; cg.font = 'bold 118px sans-serif'; cg.textAlign = 'center'; cg.fillText('VINAŘICE', 512, 500);
-    cg.fillStyle = '#b11d1d'; cg.font = 'bold 70px sans-serif'; cg.fillText('FIGHT NIGHT', 512, 590);
+    // znak uprostřed: žlutý osmiúhelník s bleskem a nápis OKTAGON
+    const oct2 = (cx, cy, r) => { cg.beginPath(); for (let k = 0; k < 8; k++) { const a = Math.PI / 8 + (k / 8) * Math.PI * 2; cg.lineTo(cx + Math.cos(a) * r, cy + Math.sin(a) * r); } cg.closePath(); };
+    oct2(512, 430, 150); cg.fillStyle = '#ffd400'; cg.fill();
+    oct2(512, 430, 108); cg.fillStyle = '#ffffff'; cg.fill();
+    oct2(512, 430, 92); cg.fillStyle = '#1b1b1b'; cg.fill();
+    cg.fillStyle = '#ffffff'; cg.beginPath(); cg.moveTo(452, 470); cg.lineTo(580, 392); cg.lineTo(520, 432); cg.lineTo(572, 432); cg.lineTo(444, 512); cg.lineTo(500, 462); cg.closePath(); cg.fill();
+    cg.fillStyle = '#ffd400'; cg.font = '900 112px "Russo One", "Arial Black", sans-serif'; cg.textAlign = 'center'; cg.fillText('OKTAGON', 512, 680);
+    cg.fillStyle = '#1b1b1b'; cg.font = '900 54px "Russo One", "Arial Black", sans-serif'; cg.fillText('VINAŘICE', 512, 745);
     cg.fillStyle = 'rgba(30,60,140,.85)'; cg.beginPath(); cg.arc(512 + Math.cos(Math.PI / 8) * 380, 512 + Math.sin(Math.PI / 8) * 380, 36, 0, 7); cg.fill();
     const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
     // osmiboká plošina (CylinderGeometry s 8 stranami = oktagon)
@@ -480,7 +486,15 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
     const trailer = new THREE.Mesh(new THREE.BoxGeometry(2.55, 3.4, 12.5), black); trailer.position.set(0, 2.45, -1.2);
     // nápis na návěsu
     const c = document.createElement('canvas'); c.width = 1024; c.height = 256; const cg = c.getContext('2d');
-    cg.fillStyle = '#0d0e10'; cg.fillRect(0, 0, 1024, 256); cg.fillStyle = '#39ff14'; cg.font = 'bold 120px sans-serif'; cg.textAlign = 'center'; cg.fillText('FIGHT NIGHT', 512, 170);
+    // žlutý nápis OKTAGON s osmiúhelníkem místo písmene O (vlastní kresba)
+    cg.fillStyle = '#0d0e10'; cg.fillRect(0, 0, 1024, 256);
+    cg.fillStyle = '#ffd400'; cg.font = '900 150px "Russo One", "Arial Black", sans-serif'; cg.textBaseline = 'middle'; cg.textAlign = 'left';
+    const word = 'KTAG', wx = 250; cg.fillText(word, wx, 128);
+    const oct = (cx, r) => { cg.beginPath(); for (let k = 0; k < 8; k++) { const a = Math.PI / 8 + (k / 8) * Math.PI * 2; cg.lineTo(cx + Math.cos(a) * r, 128 + Math.sin(a) * r); } cg.closePath(); };
+    const drawO = (cx) => { oct(cx, 70); cg.fillStyle = '#ffd400'; cg.fill(); oct(cx, 50); cg.fillStyle = '#0d0e10'; cg.fill(); oct(cx, 40); cg.fillStyle = '#ffffff'; cg.fill(); cg.fillStyle = '#0d0e10'; cg.beginPath(); cg.moveTo(cx - 26, 140); cg.lineTo(cx + 26, 110); cg.lineTo(cx + 4, 128); cg.lineTo(cx + 26, 128); cg.lineTo(cx - 26, 152); cg.lineTo(cx - 4, 136); cg.closePath(); cg.fill(); };
+    drawO(170);
+    const ww = cg.measureText(word).width; drawO(wx + ww + 85);
+    cg.fillStyle = '#ffd400'; cg.fillText('N', wx + ww + 165, 128);
     const tx = new THREE.CanvasTexture(c); tx.colorSpace = THREE.SRGBColorSpace;
     for (const sd of [-1, 1]) { const sgn = new THREE.Mesh(new THREE.PlaneGeometry(10, 2.4), new THREE.MeshStandardMaterial({ map: tx, emissive: '#ffffff', emissiveMap: tx, emissiveIntensity: 0.25 })); sgn.position.set(sd * 1.28, 2.6, -1.2); sgn.rotation.y = sd * Math.PI / 2; g.add(sgn); }
     for (const [z, n] of [[6.9, 1], [4.6, 1], [-4.5, 2], [-5.9, 2]]) for (const sd of [-1, 1]) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.52, 0.45 * n, 16), tyre); w.rotation.z = Math.PI / 2; w.position.set(sd * 1.15, 0.52, z); g.add(w); }
