@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127144046';
-import { Crowd } from './crowd.js?v=20261127144046';
-import { PrisonFX } from './prisonfx.js?v=20261127144046';
+import { makeHuman, animateHuman } from './entities.js?v=20261127144217';
+import { Crowd } from './crowd.js?v=20261127144217';
+import { PrisonFX } from './prisonfx.js?v=20261127144217';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -175,7 +175,8 @@ export class MMA {
   fighter(opts, name, team) {
     const m = makeHuman({ ...opts, scale: 1.05, tint: false });
     this.game.scene.add(m);
-    const bone = (n) => { let b = null; m.traverse((o) => { if (!b && o.name === n) b = o; }); return b; };
+    // GLTFLoader odstraní z názvů kostí tečky (Fist.L → FistL)
+    const bone = (n) => { const n2 = n.replace(/\./g, ''); let b = null; m.traverse((o) => { if (!b && (o.name === n || o.name === n2)) b = o; }); return b; };
     // MMA rukavice na obou pěstech (bachaři modré, vězni červené, rozhodčí bez)
     if (team) {
       m.updateMatrixWorld(true);
