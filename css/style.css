@@ -308,3 +308,5 @@ body.mma-play .tbtns-mma { transform: none; opacity: 1; pointer-events: auto; }
 .tb-punch { background: rgba(57,255,20,.8) !important; color: #04140b; }
 .tb-kick { background: rgba(255,214,0,.85) !important; color: #1a1400; }
 .tb-mid { width: 60px !important; height: 60px !important; font-size: 24px !important; justify-self: center; }
+.feat .fc:last-child img { position: absolute; inset: 0; } /* výška podle řádku, ne podle fotky */
+@media (max-width: 760px) { .feat .fc:last-child { aspect-ratio: 16 / 7; } }

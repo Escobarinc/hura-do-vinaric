@@ -4,8 +4,8 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127210238';
-import { Crowd } from './crowd.js?v=20261127210238';
+import { makeHuman, animateHuman } from './entities.js?v=20261127211303';
+import { Crowd } from './crowd.js?v=20261127211303';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -116,7 +116,7 @@ export class Party {
       for (let k = 0; k < 14; k++) { const o = -4.5 + (k % 7) * 1.5, row = Math.floor(k / 7); this.barSpots.push([x + bx * (1.3 + row * 0.8) + Math.cos(ang) * o, z + bz * (1.3 + row * 0.8) - Math.sin(ang) * o, ang + Math.PI]); }
     }
     // 5000 LIDÍ: rovnoměrně po dvoře, mimo pódia, bary a budovy
-    this.crowd = new Crowd(scene, { capacity: 5000, shirt: '#ffffff', pants: '#2a3140' });
+    this.crowd = new Crowd(scene, { capacity: 5000, shirt: '#3a3f4a', pants: '#20242c' });
     this.people = [];
     const busy = (x, z) => {
       const dx = x - S.x, dz = z - S.z, f = dx * fx + dz * fz, r = dx * rx + dz * rz;
@@ -176,8 +176,8 @@ export class Party {
     this.blinders = [];
     for (let k = 0; k < 8; k++) { const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: glowTex('rgba(255,255,255,1)', 'rgba(255,230,180,.6)'), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true })); sp.position.set(...P(3.8, -7 + k * 2, 10.2)); sp.scale.set(2.2, 2.2, 1); g.add(sp); this.blinders.push(sp); }
     // hlavní světlo na dav a pódium (aby bylo vidět)
-    this.washL = new THREE.PointLight('#8a6bff', 300, 140, 1.15); this.washL.position.set(...P(22, 0, 16)); g.add(this.washL);
-    this.washL2 = new THREE.PointLight('#ff4fd8', 220, 120, 1.15); this.washL2.position.set(...P(45, 0, 14)); g.add(this.washL2);
+    this.washL = new THREE.PointLight('#8a6bff', 110, 110, 1.25); this.washL.position.set(...P(22, 0, 16)); g.add(this.washL);
+    this.washL2 = new THREE.PointLight('#ff4fd8', 80, 100, 1.25); this.washL2.position.set(...P(45, 0, 14)); g.add(this.washL2);
     
     // plameny a CO2 před pódiem
     this.flameT = glowTex('rgba(255,250,200,1)', 'rgba(255,120,0,.85)');
@@ -274,8 +274,8 @@ export class Party {
     const strobeOn = F.strobe && Math.floor(this.t * 14) % 2 === 0;
     this.strobeL.intensity = strobeOn ? 220 * M : 0;
     for (const [k, B] of this.blinders.entries()) { B.visible = F.blinders || strobeOn; B.material.opacity = F.blinders ? (beat < 0.15 ? 1 : 0.15) * M : strobeOn ? 1 : 0; B.scale.setScalar(2 + (k % 2) * 0.5); }
-    this.washL.color.copy(col(5)); this.washL.intensity = 300 * M * (0.55 + pulse * 0.7);
-    this.washL2.color.copy(col(1)); this.washL2.intensity = 220 * M * (0.55 + (1 - pulse) * 0.5);
+    this.washL.color.copy(col(5)); this.washL.intensity = 110 * M * (0.55 + pulse * 0.7);
+    this.washL2.color.copy(col(1)); this.washL2.intensity = 80 * M * (0.55 + (1 - pulse) * 0.5);
     this.edge.material.color.copy(col(2));
     // LED stěna
     this.led.visible = F.led; if (F.led) this.drawLed(t, beat, col);
