@@ -4,13 +4,14 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127213625';
-import { Crowd } from './crowd.js?v=20261127213625';
+import { makeHuman, animateHuman } from './entities.js?v=20261127214230';
+import { Crowd } from './crowd.js?v=20261127214230';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
 const TRI = [[-300, 1126], [-126, 1115], [-208, 1207]]; // obrys zadního dvora
 const BPM = 122.7; // One More Time (výchozí)
+const RW = { f0: 4, f1: 13.5, w: 5 }; // molo STAGE 2: od přední hrany pódia k gogo pódiím
 
 /* Písničky: parts = [čas (s), kdo rapuje (index, -1 = všichni, null = nikdo), 'pole' = tanec u tyče]. Časy podle hlasitosti skladby. */
 const TRACKS = [
@@ -68,7 +69,7 @@ export class Party {
     if (this.active) { this.stop(); return; }
     const G = this.game;
     if (G.mma?.active) G.mma.finish(true);
-    this.active = true; this.t = 0;
+    this.active = true; this.t = 0; this.stage2 = false;
     G.setHour = 22;
     this.build();
     this.makePanel();
@@ -126,6 +127,20 @@ export class Party {
       const d = makeHuman({ female: true, uniform: { shirt: COLORS[this.gogos.length % COLORS.length], pants: '#111' }, scale: 1, tint: false });
       d.position.set(x + 0.45, y + 2.6, z); scene.add(d);
       this.gogos.push({ m: d, x: x + 0.45, y: y + 2.6, z, cx: x, cz: z, ph: Math.random() * 6, bones: this.bonesOf(d), ring });
+    }
+    // STAGE 2: vysouvací molo z pódia do davu (stejná výška 1,8 m), vysune se tlačítkem
+    {
+      const W = RW.w, rg = new THREE.Group();
+      const body = new THREE.BoxGeometry(W, 1.8, 1); body.translate(0, 0.9, 0.5);
+      rg.add(new THREE.Mesh(body, black));
+      const top = new THREE.BoxGeometry(W - 0.3, 0.03, 1); top.translate(0, 1.815, 0.5);
+      this.rwTop = new THREE.Mesh(top, new THREE.MeshStandardMaterial({ color: '#15151b', metalness: 0.7, roughness: 0.25 })); rg.add(this.rwTop);
+      const strip = new THREE.BoxGeometry(0.1, 0.1, 1); strip.translate(0, 0, 0.5);
+      this.rwStrips = [];
+      for (const sx of [-W / 2, W / 2]) for (const sy of [1.8, 0.15]) { const m = new THREE.Mesh(strip, new THREE.MeshBasicMaterial({ color: '#39ff14' })); m.position.set(sx, sy, 0); rg.add(m); this.rwStrips.push(m); }
+      const endG = new THREE.BoxGeometry(W, 0.1, 0.1); this.rwEnd = new THREE.Mesh(endG, new THREE.MeshBasicMaterial({ color: '#ff00d4' })); this.rwEnd.position.y = 1.8; rg.add(this.rwEnd);
+      rg.position.set(...P(RW.f0 - 0.2, 0, 0)); rg.rotation.y = FACE; rg.scale.z = 0.001; rg.visible = false; g.add(rg);
+      this.rw = { g: rg, L: 0, goal: 0 };
     }
     // 2 VELKÉ BARY po stranách (30 m na šířku, čelem do davu) s barmany, kteří míchají drinky
     this.bartenders = []; this.barSpots = []; this.bars = []; this.glasses = [];
@@ -207,6 +222,17 @@ export class Party {
       if (this.people.length >= 5000) break;
       this.people.push({ i: this.people.length, x: jx, z: jz, y: city.ground(jx, jz), h: Math.atan2(S.x - jx, S.z - jz) + (Math.random() - 0.5) * 0.6, ph: Math.random() * 6, hype: Math.random() });
     }
+    // lidé v cestě mola: kam uhnou (do stran) a kam se dívají, když je molo venku
+    for (const p of this.people) {
+      if (p.bar) continue;
+      const dx = p.x - S.x, dz = p.z - S.z, f = dx * fx + dz * fz, r = dx * rx + dz * rz;
+      p.m = 0;
+      if (f > RW.f0 - 0.5 && f < RW.f1 + 0.8 && Math.abs(r) < RW.w / 2 + 0.5) {
+        const nr = (r < 0 ? -1 : 1) * (RW.w / 2 + 0.6 + Math.random() * 2.2), nf = Math.min(f, RW.f1 + 0.6 + Math.random() * 2);
+        p.ax = S.x + fx * nf + rx * nr; p.az = S.z + fz * nf + rz * nr; p.rf = f;
+      }
+      if (f > 2 && f < RW.f1 + 12 && Math.abs(r) < 16) { const cf = Math.max(RW.f0, Math.min(RW.f1, f)), tx = S.x + fx * cf, tz = S.z + fz * cf; p.h2 = Math.atan2(tx - p.x, tz - p.z); }
+    }
     // oblečení: pestré barvy triček
     for (const p of this.people) this.crowd.setShirt(p.i, COLORS[Math.floor(Math.random() * COLORS.length)]);
     /* ---------------- SVĚTLA ---------------- */
@@ -282,7 +308,7 @@ export class Party {
   /* ---------------- ovládací panel ---------------- */
   makePanel() {
     const css = document.createElement('style'); css.id = 'party-css';
-    css.textContent = `#party-panel{position:fixed;right:12px;top:max(70px,calc(env(safe-area-inset-top) + 60px));z-index:42;width:min(330px,92vw);max-height:72vh;overflow:auto;background:rgba(8,8,14,.88);border:1px solid rgba(57,255,20,.4);border-radius:14px;padding:10px;font:700 12px "Chakra Petch",sans-serif;color:#fff;pointer-events:auto}
+    css.textContent = `#party-panel{position:fixed;right:12px;top:max(150px,calc(env(safe-area-inset-top) + 144px));z-index:42;width:min(330px,92vw);max-height:calc(100vh - 230px);overflow:auto;background:rgba(8,8,14,.88);border:1px solid rgba(57,255,20,.4);border-radius:14px;padding:10px;font:700 12px "Chakra Petch",sans-serif;color:#fff;pointer-events:auto}
 #party-panel h3{margin:0 0 8px;font:400 15px "Bungee",sans-serif;color:#39ff14;display:flex;justify-content:space-between;align-items:center}
 #party-panel .grid{display:grid;grid-template-columns:repeat(2,1fr);gap:5px}
 #party-panel button{font:700 12px "Chakra Petch",sans-serif;color:#cfd3da;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:8px;padding:6px 6px;cursor:pointer;text-align:left}
@@ -291,13 +317,13 @@ export class Party {
 #party-panel .sw{width:22px;height:22px;border-radius:50%;border:2px solid #fff3;cursor:pointer;padding:0}
 #party-panel .min{background:none;border:0;color:#39ff14;font-size:16px;cursor:pointer;padding:0 4px}
 #party-panel.collapsed .body{display:none}
-#party-player{position:fixed;left:50%;transform:translateX(-50%);top:max(10px,env(safe-area-inset-top));z-index:43;width:min(560px,94vw);background:rgba(8,8,14,.9);border:1px solid rgba(57,255,20,.45);border-radius:14px;padding:8px 10px;font:700 12px "Chakra Petch",sans-serif;color:#fff;pointer-events:auto;box-shadow:0 0 24px rgba(57,255,20,.15)}
-#party-player .pp-top{display:flex;align-items:center;gap:6px}#party-player .pp-top button{font-size:16px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:8px;width:34px;height:30px;cursor:pointer}
-#party-player .pp-t{flex:1;min-width:0;line-height:1.15}#party-player .pp-t b{display:block;font:400 14px "Bungee",sans-serif;color:#39ff14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#party-player .pp-t span{display:block;font-size:11px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-#party-player input{width:70px;accent-color:#39ff14}
-#party-player .pp-list{display:flex;flex-wrap:wrap;gap:5px;margin-top:7px}#party-player .pp-list button{font:700 11.5px "Chakra Petch",sans-serif;color:#cfd3da;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:4px 9px;cursor:pointer}
+#party-player{position:fixed;right:12px;top:max(56px,calc(env(safe-area-inset-top) + 50px));z-index:43;width:min(330px,92vw);background:rgba(8,8,14,.9);border:1px solid rgba(57,255,20,.45);border-radius:12px;padding:6px 8px;font:700 11px "Chakra Petch",sans-serif;color:#fff;pointer-events:auto}
+#party-player .pp-top{display:flex;align-items:center;gap:4px}#party-player .pp-top button{font-size:12px;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.18);color:#fff;border-radius:7px;width:26px;height:24px;padding:0;cursor:pointer}
+#party-player .pp-top button.st2{width:auto;padding:0 7px;font:800 11px "Chakra Petch",sans-serif;color:#04140b;background:#39ff14;border-color:#39ff14}#party-player .pp-top button.st2.on{background:#ff2d8a;border-color:#ff2d8a;color:#fff}
+#party-player .pp-t{flex:1;min-width:0;line-height:1.1}#party-player .pp-t b{display:block;font:400 11.5px "Bungee",sans-serif;color:#39ff14;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}#party-player .pp-t span{display:block;font-size:10px;opacity:.8;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#party-player input{width:46px;accent-color:#39ff14}
+#party-player .pp-list{display:flex;flex-wrap:wrap;gap:3px;margin-top:5px}#party-player .pp-list button{font:700 10px "Chakra Petch",sans-serif;color:#cfd3da;background:rgba(255,255,255,.07);border:1px solid rgba(255,255,255,.15);border-radius:20px;padding:2px 7px;cursor:pointer}
 #party-player .pp-list button.on{background:linear-gradient(90deg,rgba(57,255,20,.4),rgba(0,229,255,.3));color:#fff;border-color:#39ff14}
-@media (min-width:761px) and (max-width:1250px){#party-player{top:122px}}
 @media (max-width:760px){#party-player{top:auto;bottom:calc(150px + env(safe-area-inset-bottom))}#party-player input{display:none}}`;
     document.head.appendChild(css);
     const d = document.createElement('div'); d.id = 'party-panel';
@@ -375,6 +401,7 @@ export class Party {
     this.updateFireworks(dt);
     // DJ, tanečnice, barmani, dav
     this.animatePeople(dt, beatF, pulse);
+    this.updateRunway(dt, col);
     this.updatePerformers(dt, mt, beatF);
   }
   drawLed(t, beat, col) {
@@ -459,8 +486,12 @@ export class Party {
     for (const p of this.people) {
       if (C.dead[p.i]) continue;
       if (p.bar) { C.set(p.i, p.x, p.y, p.z, p.h, 0, Math.sin(t * 1.3 + p.ph) > 0.7 ? 'smoke' : 'walk', t); continue; }
-      const j = bounce(p.ph) * (0.6 + p.hype), mode = (p.hype > 0.35 || pulse > 0.6) ? 'riot' : 'walk';
-      C.set(p.i, p.x, p.y + j, p.z, p.h + Math.sin(t * 2 + p.ph) * 0.2, 0, mode, t);
+      const L = this.rw?.L || 0, st2 = L > 1.5;
+      if (p.ax != null) { const need = L > p.rf - RW.f0 - 1.2; p.m = Math.max(0, Math.min(1, p.m + (need ? dt * 1.6 : -dt * 0.8))); }
+      const x = p.ax != null ? p.x + (p.ax - p.x) * p.m : p.x, z = p.ax != null ? p.z + (p.az - p.z) * p.m : p.z;
+      const fan = st2 && p.h2 != null, h = fan ? p.h2 : p.h;
+      const j = bounce(p.ph) * (0.6 + p.hype) * (fan ? 1.4 : 1), mode = (fan || p.hype > 0.35 || pulse > 0.6) ? 'riot' : 'walk';
+      C.set(p.i, x, p.y + j, z, h + Math.sin(t * 2 + p.ph) * (fan ? 0.12 : 0.2), p.m > 0 && p.m < 1 ? 1.2 : 0, mode, t);
     }
     C.commit();
   }
@@ -468,7 +499,7 @@ export class Party {
   /* ---------------- přehrávač a rappeři ---------------- */
   makePlayer() {
     const d = document.createElement('div'); d.id = 'party-player';
-    d.innerHTML = `<div class="pp-top"><button data-p="prev">⏮</button><button data-p="play">⏸</button><button data-p="next">⏭</button><div class="pp-t"><b></b><span></span></div><input type="range" min="0" max="1" step="0.05" value="0.95" data-p="vol"></div>
+    d.innerHTML = `<div class="pp-top"><button data-p="prev">⏮</button><button data-p="play">⏸</button><button data-p="next">⏭</button><button data-p="stage2" class="st2">STAGE 2</button><div class="pp-t"><b></b><span></span></div><input type="range" min="0" max="1" step="0.05" value="0.95" data-p="vol"></div>
 <div class="pp-list">${TRACKS.map((t, i) => `<button data-i="${i}">${t.genre === 'hiphop' ? '🎤' : '🎧'} ${t.title}</button>`).join('')}</div>`;
     document.body.appendChild(d); this.player = d;
     d.addEventListener('pointerdown', (e) => e.stopPropagation());
@@ -479,6 +510,7 @@ export class Party {
       const p = b.dataset.p;
       if (p === 'prev') this.setTrack((this.ti + TRACKS.length - 1) % TRACKS.length);
       if (p === 'next') this.setTrack((this.ti + 1) % TRACKS.length);
+      if (p === 'stage2') { this.toggleStage2(); b.classList.toggle('on', this.stage2); b.textContent = this.stage2 ? 'STAGE 2 ✕' : 'STAGE 2'; }
       if (p === 'play' && this.music) { if (this.music.paused) this.music.play().catch(() => {}); else this.music.pause(); this.syncPlayer(); }
     });
     d.addEventListener('input', (e) => { if (e.target.dataset.p === 'vol') { this.vol = +e.target.value; if (this.music) this.music.volume = this.vol; } });
@@ -518,6 +550,19 @@ export class Party {
       g.fillText(t.artist, 512, 126, 990);
     }
     g.shadowBlur = 0; this.bannerT.needsUpdate = true;
+  }
+  toggleStage2() {
+    this.stage2 = !this.stage2; this.rw.goal = this.stage2 ? RW.f1 - RW.f0 : 0;
+    this.game.audio?.noise?.(1.2, 0.25, 120);
+    this.game.toast?.(this.stage2 ? '🚀 STAGE 2 – molo vyjíždí do davu' : 'STAGE 2 zajíždí zpět');
+  }
+  updateRunway(dt, col) {
+    const R = this.rw; if (!R) return;
+    const goal = this.stage2 ? R.goal : this.rwBusy ? R.L : 0; // nezajede, dokud na něm stojí rappeři
+    const d = goal - R.L; if (Math.abs(d) > 0.01) { R.L += Math.sign(d) * Math.min(Math.abs(d), dt * 2.4); if (Math.random() < dt * 3) this.game.audio?.noise?.(0.15, 0.08, 90); }
+    R.g.visible = R.L > 0.02; R.g.scale.z = Math.max(0.001, R.L + 0.2);
+    this.rwEnd.scale.z = 1 / R.g.scale.z; this.rwEnd.position.z = 1;
+    for (const [k, m] of this.rwStrips.entries()) m.material.color.copy(col(k));
   }
   clearPerformers() {
     const sc = this.game.scene;
@@ -566,25 +611,50 @@ export class Party {
       p.g.position.y = p.y + p.h; p.ring.material.color.setHSL((t * 0.3 + i * 0.5) % 1, 1, 0.55);
       if (p.down && p.h < -5.3) { this.group.remove(p.g); this.poles.splice(i, 1); }
     }
-    if (!this.rappers?.length) { this.curRapper = null; return; }
+    if (!this.rappers?.length) { this.curRapper = null; this.rwBusy = false; return; }
     // kdo právě rapuje: -1 = všichni (refrén), null = nikdo, 'pole' = tanec u tyče
     let seg = tr.parts[0];
     for (const s of tr.parts) if (mt >= s[0]) seg = s;
     const who = seg[1], poleDance = seg[2] === 'pole' || (tr.poles && who === null);
     const bounce = Math.max(0, Math.sin(beatF * Math.PI * 2)) * 0.12;
+    let busy = 0;
     for (const R of this.rappers) {
       R.t += dt;
+      if ((R.m.position.x - S.x) * Math.sin(FACE) + (R.m.position.z - S.z) * Math.cos(FACE) > RW.f0 - 0.2) busy++;
       const active = who === -1 || who === R.k;
       let x, z, speed = 0, face = FACE;
       if (R.t < 0) { x = R.sx; z = R.sz; }
       else if (R.t < 3) { const a = R.t / 3; x = R.sx + (R.tx - R.sx) * a; z = R.sz + (R.tz - R.sz) * a; speed = 2.5; face = Math.atan2(R.tx - R.sx, R.tz - R.sz); }
-      else if (poleDance && R.pole && R.pole.h > -0.3) { const a = t * 1.1 + R.ph; x = R.pole.x + Math.cos(a) * 0.42; z = R.pole.z + Math.sin(a) * 0.42; face = Math.atan2(R.pole.x - x, R.pole.z - z) + Math.PI / 2 + Math.sin(t * 2.4 + R.ph) * 0.35; }
-      else { const sway = active ? Math.sin(t * 1.3 + R.ph) * 0.5 : 0; x = R.tx + Math.cos(FACE) * sway; z = R.tz - Math.sin(FACE) * sway; face = FACE + Math.sin(t * 0.8 + R.ph) * (active ? 0.45 : 0.2); }
-      R.m.position.set(x, R.y + (R.t >= 3 ? bounce * (active ? 1.6 : 0.8) : 0), z); R.m.rotation.y = face;
+      else {
+        // domovské místo: hlavní pódium, nebo molo STAGE 2
+        const n = this.rappers.length, L = this.rw?.L || 0;
+        const rf = RW.f0 + 1.4 + (R.k + 0.5) * ((RW.f1 - RW.f0 - 2) / n), rr = (R.k % 2 ? 1 : -1) * (n > 2 ? 1.2 : 0.9);
+        const onRw = this.stage2 && L > rf - RW.f0 + 0.5;
+        let hx = R.tx, hz = R.tz;
+        if (onRw) { hx = S.x + Math.sin(FACE) * rf + Math.cos(FACE) * rr; hz = S.z + Math.cos(FACE) * rf - Math.sin(FACE) * rr; }
+        // cesta: z pódia na molo (a zpět) jen přes jeho začátek, ne vzduchem
+        const lf = (q, w) => (q - S.x) * Math.sin(FACE) + (w - S.z) * Math.cos(FACE), lr = (q, w) => (q - S.x) * Math.cos(FACE) - (w - S.z) * Math.sin(FACE);
+        const cf = lf(R.cx, R.cz), cr = lr(R.cx, R.cz), hf = lf(hx, hz);
+        let gx = hx, gz = hz;
+        if ((hf > RW.f0 && cf < RW.f0 + 0.3 && Math.abs(cr) > 1.6) || (hf < RW.f0 && cf > RW.f0 - 0.2 && Math.abs(lr(hx, hz)) > 1.6 && cf > 3.4)) {
+          const wf = 3.3, wr = Math.sign(cr || 1) * 1.0; gx = S.x + Math.sin(FACE) * wf + Math.cos(FACE) * wr; gz = S.z + Math.cos(FACE) * wf - Math.sin(FACE) * wr;
+          if (Math.hypot(gx - R.cx, gz - R.cz) < 0.3) { gx = hx; gz = hz; }
+        }
+        const dd = Math.hypot(gx - R.cx, gz - R.cz);
+        if (dd > 0.08) { const st = Math.min(dd, dt * 2.6); R.cx += (gx - R.cx) / dd * st; R.cz += (gz - R.cz) / dd * st; speed = 2.6; face = Math.atan2(gx - R.cx, gz - R.cz); x = R.cx; z = R.cz; R.walking = true; }
+        else {
+          R.walking = false; R.cx = hx; R.cz = hz;
+          const inRw = lf(R.cx, R.cz) > RW.f0 + 0.3;
+          if (poleDance && R.pole && R.pole.h > -0.3 && !inRw) { const a = t * 1.1 + R.ph; x = R.pole.x + Math.cos(a) * 0.42; z = R.pole.z + Math.sin(a) * 0.42; face = Math.atan2(R.pole.x - x, R.pole.z - z) + Math.PI / 2 + Math.sin(t * 2.4 + R.ph) * 0.35; }
+          else if (inRw) { const side = lr(R.cx, R.cz) < 0 ? -1 : 1; x = R.cx + Math.sin(FACE) * Math.sin(t * 0.9 + R.ph) * (active ? 0.6 : 0.2); z = R.cz + Math.cos(FACE) * Math.sin(t * 0.9 + R.ph) * (active ? 0.6 : 0.2); face = FACE + side * (Math.PI / 2) * (0.5 + 0.5 * Math.sin(t * 0.7 + R.ph)) ; }
+          else { const sway = active ? Math.sin(t * 1.3 + R.ph) * 0.5 : 0; x = R.cx + Math.cos(FACE) * sway; z = R.cz - Math.sin(FACE) * sway; face = FACE + Math.sin(t * 0.8 + R.ph) * (active ? 0.45 : 0.2); }
+        }
+      }
+      R.m.position.set(x, R.y + (R.t >= 3 && !R.walking ? bounce * (active ? 1.6 : 0.8) : 0), z); R.m.rotation.y = face;
       animateHuman(R.m, speed, dt);
       const B = R.bones;
       if (R.t >= 3) {
-        if (poleDance && R.pole) { // sexy tanec u tyče: ruka na tyči, vlnění boky
+        if (R.walking) { /* jde */ } else if (poleDance && R.pole) { // sexy tanec u tyče (na molu bez tyče): ruka na tyči, vlnění boky
           if (B.uaL) B.uaL.rotation.x -= 2.7; if (B.uaR) B.uaR.rotation.x -= 2.1 + Math.sin(t * 3 + R.ph) * 0.5;
           if (B.hips) B.hips.rotation.y += Math.sin(t * 4.2 + R.ph) * 0.45; if (B.torso) B.torso.rotation.z += Math.sin(t * 4.2 + R.ph + 1) * 0.3;
         } else if (active) { // rapuje: mikrofon u pusy, druhá ruka gestikuluje do rytmu
@@ -598,9 +668,10 @@ export class Party {
       R.m.updateMatrixWorld(true);
       if (B.fistR) { B.fistR.getWorldPosition(R.mic.position); R.mic.position.y += 0.1; }
       R.mic.rotation.set(-0.5, face, 0, 'YXZ');
-      R.spot.visible = active && R.t >= 3 && !poleDance; R.spot.position.set(x, R.y + 9, z);
+      R.spot.visible = active && R.t >= 3 && (!poleDance || this.stage2); R.spot.position.set(x, R.y + 9, z);
       R.spot.material.opacity = 0.14 + bounce * 0.4;
     }
+    this.rwBusy = busy > 0;
     // ukazatel, kdo rapuje
     this.curRapper = who === -1 ? 'všichni' : who == null ? null : tr.rappers[who]?.name;
     const name = who === -1 ? 'všichni' : who === null ? (poleDance ? 'tanec u tyče' : '—') : tr.rappers[who]?.name;
