@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127200817';
-import { Crowd } from './crowd.js?v=20261127200817';
-import { PrisonFX } from './prisonfx.js?v=20261127200817';
+import { makeHuman, animateHuman } from './entities.js?v=20261127201209';
+import { Crowd } from './crowd.js?v=20261127201209';
+import { PrisonFX } from './prisonfx.js?v=20261127201209';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -62,14 +62,11 @@ export class MMA {
     // podlaha oktagonu (plachta s logem a červeným osmiúhelníkem)
     const cv = document.createElement('canvas'); cv.width = cv.height = 1024;
     const cg = cv.getContext('2d');
-    cg.fillStyle = '#d8d6cf'; cg.fillRect(0, 0, 1024, 1024);
-    for (let i = 0; i < 5000; i++) { cg.fillStyle = `rgba(0,0,0,${Math.random() * 0.03})`; cg.fillRect(Math.random() * 1024, Math.random() * 1024, 3, 3); }
-    const oct = (r) => { cg.beginPath(); for (let k = 0; k <= 8; k++) { const a = (k / 8) * Math.PI * 2 + Math.PI / 8; cg.lineTo(512 + Math.cos(a) * r, 512 + Math.sin(a) * r); } };
-    cg.strokeStyle = '#b11d1d'; cg.lineWidth = 12; oct(480); cg.stroke();
-    // logo OKTAGON MMA uprostřed plachty
-    // logo uprostřed: žlutý osmiúhelník na černém podkladu, uvnitř OKTAGON MMA
-    oktagonMark(cg, 512, 512, 560);
-    cg.save(); cg.fillStyle = '#ffd700'; cg.font = '900 92px "Russo One", "Arial Black", sans-serif'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.fillText('OKTAGON', 512, 490); cg.fillStyle = '#ffffff'; cg.font = '900 58px "Russo One", "Arial Black", sans-serif'; cg.fillText('MMA', 512, 575); cg.restore();
+    // černá plachta, přes celou plochu žlutý osmiúhelník (dodané logo), uprostřed OKTAGON MMA
+    cg.fillStyle = '#0c0c0d'; cg.fillRect(0, 0, 1024, 1024);
+    for (let i = 0; i < 5000; i++) { cg.fillStyle = `rgba(255,255,255,${Math.random() * 0.025})`; cg.fillRect(Math.random() * 1024, Math.random() * 1024, 3, 3); }
+    cg.save(); cg.fillStyle = '#ffd700'; cg.font = '900 120px "Russo One", "Arial Black", sans-serif'; cg.textAlign = 'center'; cg.textBaseline = 'middle'; cg.fillText('OKTAGON', 512, 485); cg.fillStyle = '#ffffff'; cg.font = '900 70px "Russo One", "Arial Black", sans-serif'; cg.fillText('MMA', 512, 585); cg.restore();
+    withLogo(() => { cg.save(); cg.translate(512, 512); cg.rotate(Math.PI / 8); const S = 945; cg.drawImage(LOGO, -S / 2, -S / 2, S, S); cg.restore(); });
     const ft = new THREE.CanvasTexture(cv); ft.colorSpace = THREE.SRGBColorSpace;
     withLogo(() => { ft.needsUpdate = true; });
     // osmiboká plošina (CylinderGeometry s 8 stranami = oktagon)
@@ -167,7 +164,7 @@ export class MMA {
     const ux = this.entries.blue.ux, uz = this.entries.blue.uz;
     // osvětlení jako na turnaji: stožáry s reflektory, kužely světla, barevné lasery, hlavní světlo nad klecí
     this.beams = []; this.lasers = [];
-    const coneM = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.1, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
+    const coneM = (c) => new THREE.MeshBasicMaterial({ color: c, transparent: true, opacity: 0.045, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide });
     for (let k = 0; k < 6; k++) {
       const a = (k / 6) * Math.PI * 2 + 0.3, px = C.x + Math.cos(a) * 17, pz = C.z + Math.sin(a) * 17, Hh = 10;
       const pole = new THREE.Mesh(new THREE.CylinderGeometry(0.13, 0.18, Hh, 8), mat('#2c2c2c', { metalness: 0.6 })); pole.position.set(px, gy + Hh / 2, pz); g.add(pole);
@@ -534,8 +531,18 @@ body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!im
       const fin = [[-360, 1065.6], [-350.8, 1116], [-174.5, 1046], [-174.5, 1068], [-156, 1094]][Math.floor(Math.random() * 5)]; // L, M, K
       return [[-262 + J(), 1128 + J()], [-266.3 + J() * 0.5, 1120.6], [-266.3 + J() * 0.5, 1110], [-266 + J(), 1096 + J()], [-268 + J(), 1070 + J()], hub, [fin[0] + J(), fin[1] + J()]];
     };
-    for (const f of this.fans) { f.route = route(); f.ri = 0; f.sp = 1.3 + Math.random() * 0.6; f.delay = Math.random() * 10; f.gone = false; }
-    for (const p of this.guardPos) { p.route = route(); p.ri = 0; p.sp = 1.5; p.delay = 4 + Math.random() * 6; }
+    // obchůzka kolem klece: když by cesta k prvnímu bodu vedla přes oktagon, přidají se body po obvodu
+    const around = (x, z, r) => {
+      const w = r[0], ax = x - C.x, az = z - C.z, bx = w[0] - C.x, bz = w[1] - C.z;
+      const ex = w[0] - x, ez = w[1] - z, l2 = ex * ex + ez * ez || 1, t = Math.max(0, Math.min(1, -(ax * ex + az * ez) / l2));
+      if (Math.hypot(ax + ex * t, az + ez * t) > R + 1.8) return r;
+      let a0 = Math.atan2(az, ax), a1 = Math.atan2(bz, bx), da = Math.atan2(Math.sin(a1 - a0), Math.cos(a1 - a0));
+      const pts = [], n = Math.ceil(Math.abs(da) / (Math.PI / 6)), rr = R + 2.8;
+      for (let k = 1; k <= n; k++) { const a = a0 + (da * k) / n; pts.push([C.x + Math.cos(a) * rr, C.z + Math.sin(a) * rr]); }
+      return [...pts, ...r];
+    };
+    for (const f of this.fans) { f.route = around(f.x, f.z, route()); f.ri = 0; f.sp = 1.3 + Math.random() * 0.6; f.delay = Math.random() * 10; f.gone = false; }
+    for (const p of this.guardPos) { p.route = around(p.x, p.z, route()); p.ri = 0; p.sp = 1.5; p.delay = 4 + Math.random() * 6; }
     for (const d of this.dogs) this.game.scene.remove(d.m);
     // dva dlouhé černé kamiony vjedou vjezdem zásobování
     const path = MMA.TRUCK_IN;
