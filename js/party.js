@@ -4,9 +4,10 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128002926';
-import { Avengers } from './avengers.js?v=20261128002926';
-import { Crowd } from './crowd.js?v=20261128002926';
+import { makeHuman, animateHuman } from './entities.js?v=20261128005025';
+import { PartyFab } from './partyfab.js?v=20261128005025';
+import { Avengers } from './avengers.js?v=20261128005025';
+import { Crowd } from './crowd.js?v=20261128005025';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -87,6 +88,7 @@ export class Party {
     this.makePlayer();
     this.setTrack(0);
     this.av.hookFloor();
+    if (this.game.mobile || matchMedia('(pointer: coarse)').matches || innerWidth < 760) { (this.fab ||= new PartyFab(this)).mount(); } // mobil: kolečko místo panelů
     G.toast?.('🎉 PARTY! Ovládání světel vpravo · tlačítko PARTY znovu = konec');
   }
 
@@ -748,7 +750,7 @@ export class Party {
     const G = this.game;
     this.active = false;
     this.music?.pause(); this.music = null;
-    this.av.stop();
+    this.av.stop(); this.fab?.unmount();
     this.clearPerformers(); this.poles = []; this.player?.remove(); this.player = null;
     G.scene.remove(this.group);
     for (const m of [this.dj, ...this.gogos.map((d) => d.m), ...this.bartenders.map((b) => b.m)]) G.scene.remove(m);

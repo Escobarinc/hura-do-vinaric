@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128002926';
+import { makeHuman, animateHuman } from './entities.js?v=20261128005025';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -16,8 +16,8 @@ const HEROES = [
 ];
 const ABIL = {
   iron: [['fly', '🚀 Let'], ['shoot', '💥 Střílej']],
-  cap: [['hammer', '🔨 Hoď'], ['axe', '🪓 Hoď'], ['pass', '🔨➜ Thor'], ['passAxe', '🪓➜ Thor'], ['callHammer', '🔨 Ke mně'], ['callAxe', '🪓 Ke mně']],
-  thor: [['axe', '🪓 Hoď'], ['hammer', '🔨 Hoď'], ['pass', '🔨➜ Kapitán'], ['passAxe', '🪓➜ Kapitán'], ['callHammer', '🔨 Ke mně'], ['callAxe', '🪓 Ke mně'], ['bolts', '⚡ Blesky']],
+  cap: [['swapHammer', '🔨 ⇄'], ['swapAxe', '🪓 ⇄']],
+  thor: [['swapHammer', '🔨 ⇄'], ['swapAxe', '🪓 ⇄'], ['bolts', '⚡ Blesky']],
   spidey: [['swing', '🕸️ Zhoupni se'], ['web', '🕷️ Síť']],
   hulk: [['smash', '👊 SMASH'], ['leap', '🦘 Skok']],
 };
@@ -98,7 +98,7 @@ export class Avengers {
     // kladivo a sekera: když jejich držitel na pódiu není, vezme si je ten, kdo právě přišel (Thor nebo Kapitán)
     for (const it of [this.hammer, this.axe]) if (!it.fly && !this.hero(it.holder)) { const nh = fresh.find((h) => h.id === 'thor' || (it === this.hammer && h.id === 'cap')); if (nh) { it.holder = nh.id; it.obj.visible = true; } } // sekera patří jen Thorovi
     if (this.p.stage2) fresh.forEach((H) => { const i = H.k; H.home = 'rw'; H.path.push(this.W(this.p.RW.f0 - 0.5, Math.max(-1.5, Math.min(1.5, H.r))), this.W(this.p.RW.f0 + 3.5 + i * 5.6, 0)); });
-    this.G.toast?.(id ? `🦸 ${fresh[0].name} přichází${this.p.stage2 ? ' na STAGE 2' : ' na pódium'}` : this.p.stage2 ? '🦸 Avengers jdou rovnou na STAGE 2! Ovladač je dole.' : '🦸 Avengers přicházejí na pódium! Ovladač je dole.');
+    this.G.toast?.(id ? `🦸 ${fresh[0].name} přichází${this.p.stage2 ? ' na STAGE 2' : ' na pódium'}` : this.p.stage2 ? '🦸 Avengers jdou rovnou na STAGE 2!' + (this.p.fab?.el ? ' Ovládání je v kolečku 🎛️.' : ' Ovladač je dole.') : '🦸 Avengers přicházejí na pódium!' + (this.p.fab?.el ? ' Ovládání je v kolečku 🎛️.' : ' Ovladač je dole.'));
     if (id) this.sel = id;
     this.renderPanel();
   }
@@ -136,6 +136,14 @@ export class Avengers {
       const it = what === 'callAxe' ? this.axe : this.hammer;
       if (it.holder === id && !it.fly) { this.G.toast?.(`${H.name} už ${what === 'callAxe' ? 'sekeru' : 'kladivo'} drží`); return; }
       it.obj.visible = true; it.fly = { ph: 'to', to: id, kill: false }; H.armT = 0.5; H.faceA = H.h; au?.blip?.(500, 0.3, 'triangle', 0.08, 900);
+    } else if (what === 'swapHammer' || what === 'swapAxe') { // jedno tlačítko: zbraň letí mezi Kapitánem a Thorem tam a zpět
+      const it = what === 'swapAxe' ? this.axe : this.hammer, nm = what === 'swapAxe' ? 'Sekera' : 'Kladivo';
+      if (it.fly) { this.G.toast?.(`${nm} je ve vzduchu`); return; }
+      const from = this.hero(it.holder), toId = it.holder === 'cap' ? 'thor' : 'cap', T = this.hero(toId);
+      if (!T) { if (!from) { const any = this.hero('thor') || this.hero('cap'); if (any) { it.obj.visible = true; it.fly = { ph: 'to', to: any.id, kill: false }; } } else this.G.toast?.(`Na pódiu chybí ${toId === 'cap' ? 'Kapitán' : 'Thor'}`); return; }
+      if (!from) { it.obj.visible = true; it.fly = { ph: 'to', to: toId, kill: false }; return; }
+      from.armT = 0.5; from.faceA = Math.atan2(T.x - from.x, T.z - from.z);
+      it.fly = { ph: 'to', to: toId, kill: false }; au?.noise?.(0.3, 0.3, 500);
     } else if (what === 'bolts') {
       this.storm = { t: 0, T: 5, who: H, tp }; H.armT = 0; au?.noise?.(1.5, 0.6, 150);
     } else if (what === 'smash') {
@@ -872,7 +880,7 @@ export class Avengers {
         h += call;
         h += `<div class="r">${live.map((x) => `<button data-sel="${x.id}"${on(x.id === this.sel)}>${x.name.replace('Kapitán Amerika', 'Kapitán')}${this.ctrl === x ? ' 🎮' : ''}</button>`).join('')}</div>`;
         h += `<div class="r">${ABIL[H.id].map(([a, l]) => `<button data-act="${a}">${l}</button>`).join('')}</div>`;
-        h += `<div class="r"><span>Směr</span>${[[1.0, '⬅'], [0.5, '↖'], [0, '⬆'], [-0.5, '↗'], [-1.0, '➡']].map(([a, l]) => `<button data-aim="${a}"${on(Math.abs(this.aim - a) < 0.01)}>${l}</button>`).join('')}<button data-pos="1"${on(this.ctrl === H)}>${this.ctrl === H ? '🎮 Pustit (L)' : '🎮 Ovládat'}</button><span class="info">🔨 ${this.hero(this.hammer.holder)?.name.split(' ')[0] || '—'} · 🪓 ${this.hero(this.axe.holder)?.name.split(' ')[0] || '—'}</span></div>`;
+        h += `<div class="r"><button data-pos="1"${on(this.ctrl === H)}>${this.ctrl === H ? '🎮 Pustit (L)' : '🎮 Ovládat'}</button><span class="info">🔨 ${this.hero(this.hammer.holder)?.name.split(' ')[0] || '—'} · 🪓 ${this.hero(this.axe.holder)?.name.split(' ')[0] || '—'}</span></div>`;
       }
     } else if (tab === 'team') {
       if (!live.length) h += call;
