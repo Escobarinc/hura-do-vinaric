@@ -143,8 +143,8 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.xhair.style.display = show && w ? 'block' : 'none';
     this.label.style.display = show ? 'block' : 'none';
     this.label.innerHTML = w
-      ? `${w.icon} <b>${w.name}</b> <span>· K / myš = ${w.grenade ? 'hod' : 'střelba'} · Q / kolečko = další zbraň · 1–5 · 0 schovat</span>`
-      : '👊 <b>Pěsti</b> <span>· myš / F = rána · zbraně: Q nebo kolečko · 1 pistole · 2 brokovnice · 3 samopal · 4 granát · 5 bazuka</span>';
+      ? `${w.icon} <b>${w.name}</b> <span>· K / myš = ${w.grenade ? 'hod' : 'střelba'} · Q / kolečko = další zbraň · 1–5 · 6 pěsti</span>`
+      : '👊 <b>Pěsti (6)</b> <span>· myš / F = rána · zbraně: Q nebo kolečko · 1 pistole · 2 brokovnice · 3 samopal · 4 granát · 5 bazuka</span>';
   }
 
   /* ---------- cíle ---------- */
@@ -881,6 +881,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     const G = this.game, inp = G.input;
     let pick = null;
     for (let k = 0; k < NW; k++) if (inp.hit('Digit' + k) || inp.hit('Numpad' + k)) pick = k;
+    if (inp.hit('Digit6') || inp.hit('Numpad6')) pick = 0; // 6 = pěsti (jako 0)
     // Q / kolečko myši: další zbraň dokola (0 → 1 → … → bazuka → 0)
     if (inp.hit('KeyQ')) pick = (this.slot + 1) % NW;
     if (inp.wheel) { pick = (this.slot + (inp.wheel > 0 ? 1 : NW - 1)) % NW; inp.wheel = 0; }
@@ -889,7 +890,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       this.slot = pick;
       G.audio?.blip?.(500 + pick * 60, 0.05, 'square', 0.04);
       const w = WEAPONS[pick];
-      G.toast?.(w ? `${w.icon} ${w.name}` : '👊 Pěsti – myš / F = rána');
+      G.toast?.(w ? `${w.icon} ${w.name}` : '👊 Pěsti (6) – myš / F = rána');
       this.updateHud();
     }
     const onFoot = G.mode === 'foot' && G.player.hp > 0;
