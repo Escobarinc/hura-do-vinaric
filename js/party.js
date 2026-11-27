@@ -4,8 +4,8 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127214508';
-import { Crowd } from './crowd.js?v=20261127214508';
+import { makeHuman, animateHuman } from './entities.js?v=20261127214704';
+import { Crowd } from './crowd.js?v=20261127214704';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -30,12 +30,20 @@ const TRACKS = [
     rappers: [
       { name: 'Yzomandias', model: 'Casual2_Male', shirt: '#111111', pants: '#1b1b1b' },
       { name: 'PTK', model: 'Casual3_Male', shirt: '#c9a227', pants: '#222' },
+      { name: 'Crew – Robin', model: 'Casual_Male', shirt: '#e8e8e8', pants: '#2b2b33' },
+      { name: 'Crew – Ektor', model: 'Suit_Male', shirt: '#1d1d22', pants: '#1d1d22' },
+      { name: 'Crew – Pintlich', model: 'Worker_Male', shirt: '#2f6bff', pants: '#222' },
+      { name: 'Crew – Nik', model: 'Casual_Bald', shirt: '#b3202a', pants: '#111' },
     ],
     parts: [[0, null], [2, 0], [21, 1], [36, 0], [51, -1], [65, 1], [82, 0], [97, 1], [113, 0], [129, -1], [143, 1], [160, 0], [175, null]] },
   { title: 'Kolem Krku', artist: 'Nik Tendo & Decky', src: 'assets/audio/kolem-krku.mp3', bpm: 100, genre: 'hiphop', led: ['KOLEM', 'KRKU'],
     rappers: [
       { name: 'Nik Tendo', model: 'Casual_Bald', shirt: '#b3202a', pants: '#111' },
       { name: 'Decky', model: 'Casual_Male', shirt: '#f2f2f2', pants: '#26262e' },
+      { name: 'Crew – Yzo', model: 'Casual2_Male', shirt: '#111111', pants: '#1b1b1b' },
+      { name: 'Crew – PTK', model: 'Casual3_Male', shirt: '#c9a227', pants: '#222' },
+      { name: 'Crew – Ektor', model: 'Suit_Male', shirt: '#1d1d22', pants: '#1d1d22' },
+      { name: 'Crew – Robin', model: 'Worker_Male', shirt: '#2f6bff', pants: '#222' },
     ],
     parts: [[0, null], [17, 0], [36, 1], [55, -1], [69, 1], [81, 0], [100, 1], [119, -1], [133, 0], [145, 1], [164, 0], [183, -1], [197, null]] },
   { title: 'UKA MI', artist: 'Annet X & Sara Rikas', src: 'assets/audio/uka-mi.mp3', bpm: 113, genre: 'hiphop', led: ['UKA', 'MI'], poles: true,
