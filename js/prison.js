@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261128005025';
-import { labelTexture } from './textures.js?v=20261128005025';
-import { Crowd } from './crowd.js?v=20261128005025';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261128005303';
+import { labelTexture } from './textures.js?v=20261128005303';
+import { Crowd } from './crowd.js?v=20261128005303';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1211,8 +1211,9 @@ export class PrisonLife {
   /* ---------------- tlačítka (vlevo nahoře) ---------------- */
   makeButtons() {
     const css = document.createElement('style');
-    css.textContent = `#prison-btns{position:absolute;left:16px;top:max(14px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;gap:6px;max-width:min(560px,70vw);pointer-events:auto;z-index:25}
-#prison-btns button{font:700 13px "Chakra Petch",sans-serif;color:#eef2f5;background:rgba(14,18,23,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px;cursor:pointer}
+    css.textContent = `#prison-btns{position:absolute;left:16px;top:max(14px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;gap:4px;max-width:min(470px,62vw);pointer-events:auto;z-index:25}
+#prison-btns button{font:700 11px "Chakra Petch",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);border:1px solid rgba(255,255,255,.14);border-radius:8px;padding:4px 8px;cursor:pointer}
+@media (pointer: coarse),(max-width:700px){#prison-btns button{font-size:13px;padding:7px 11px;border-radius:10px}}
 #prison-btns button:hover{background:rgba(57,255,20,.8);color:#04140b}
 #prison-btns .pb-toggle{display:none;background:rgba(57,255,20,.85);color:#04140b}
 @media (pointer: coarse),(max-width:700px){#prison-btns{flex-direction:column;align-items:flex-start;max-width:60vw;left:max(10px,env(safe-area-inset-left))}#prison-btns .pb-toggle{display:block}#prison-btns:not(.open) button:not(.pb-toggle){display:none}#prison-btns button{font-size:14px;padding:9px 13px}#prison-btns .pb-toggle{font-size:13px;padding:8px 10px}#meal-pick{top:60px;left:10px}}
@@ -1243,6 +1244,7 @@ export class PrisonLife {
     add('🎉 PARTY', () => this.game.party.start());
     add('🦸 AVENGERS', () => this.game.party.avengers());
     add('🌀 STARGATE', () => this.game.party.stargate());
+    add('☠ DOOM', () => this.game.party.doomMenu());
     add('🥊 MMA – hraj za vězně', () => { const M = this.game.mma; if (M.active) M.takeOver(); else this.openMmaPicker(true); });
     add('🔄 Restart', () => this.resetAll());
     add('📍 Teleport (T)', () => this.game.hud.openTeleport(this.game));

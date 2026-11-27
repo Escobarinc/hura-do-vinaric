@@ -1,4 +1,4 @@
-import { fmtMoney } from './util.js?v=20261128005025';
+import { fmtMoney } from './util.js?v=20261128005303';
 
 const $ = (id) => document.getElementById(id);
 const MAP_SCALE = 0.5; // px na metr v předrenderované mapě

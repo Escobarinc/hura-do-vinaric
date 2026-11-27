@@ -4,10 +4,10 @@
  * stroboskopy, světla na domech, konfety, plameny, mlha a ohňostroj. Ovládací panel s 20 efekty (ručně mixovat).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128005025';
-import { PartyFab } from './partyfab.js?v=20261128005025';
-import { Avengers } from './avengers.js?v=20261128005025';
-import { Crowd } from './crowd.js?v=20261128005025';
+import { makeHuman, animateHuman } from './entities.js?v=20261128005303';
+import { PartyFab } from './partyfab.js?v=20261128005303';
+import { Avengers } from './avengers.js?v=20261128005303';
+import { Crowd } from './crowd.js?v=20261128005303';
 
 const S = { x: -204, z: 1170 }; // střed hlavního pódia
 const FACE = Math.atan2(-232 - S.x, 1146 - S.z); // pódium hledí do dvora (k davu)
@@ -77,20 +77,41 @@ export class Party {
     this.S = S; this.FACE = FACE; this.RW = RW; this.av = new Avengers(this);
   }
 
-  start() {
+  /**
+   * PARTY. lite = jen pódium s molem pro Avengers / hvězdnou bránu / Dooma (bez hudby, světel, davu a obsluhy, čas se nemění).
+   * PARTY během lite režimu rozjede mejdan kolem nich; PARTY během mejdanu vše ukončí.
+   */
+  start(opts = {}) {
+    if (this.active && this.lite && !opts.lite) { this.upgrade(); return; }
     if (this.active) { this.stop(); return; }
     const G = this.game;
     if (G.mma?.active) G.mma.finish(true);
-    this.active = true; this.t = 0; this.stage2 = false;
-    G.setHour = 22;
+    this.active = true; this.t = 0; this.stage2 = false; this.lite = !!opts.lite;
+    if (!this.lite) G.setHour = 22;
     this.build();
+    this.av.hookFloor();
+    if (this.game.mobile || matchMedia('(pointer: coarse)').matches || innerWidth < 760) { (this.fab ||= new PartyFab(this)).mount(); } // mobil: kolečko místo panelů
+    if (this.lite) { this.liteShow(false); this.crowd.hideAll(true); return; }
     this.makePanel();
     this.makePlayer();
     this.setTrack(0);
-    this.av.hookFloor();
-    if (this.game.mobile || matchMedia('(pointer: coarse)').matches || innerWidth < 760) { (this.fab ||= new PartyFab(this)).mount(); } // mobil: kolečko místo panelů
     G.toast?.('🎉 PARTY! Ovládání světel vpravo · tlačítko PARTY znovu = konec');
   }
+  /** Z lite režimu na plný mejdan: noc, hudba, světla, dav, DJ, tanečnice a barmani. */
+  upgrade() {
+    this.lite = false; this.game.setHour = 22; this.liteShow(true);
+    this.makePanel(); this.makePlayer(); this.setTrack(0); this.fab?.render();
+    this.game.toast?.('🎉 PARTY se rozjíždí kolem Avengers!');
+  }
+  /** Schová / ukáže vše, co k samotnému pódiu nepatří (světelná show, DJ, tanečnice, barmani). */
+  liteShow(on) {
+    const list = [...this.lasers.map((l) => l.m), ...this.heads.map((h) => h.m), ...this.walls.map((w) => w.m || w.light), this.strobeL, ...this.blinders, this.washL, this.washL2,
+      ...this.flames.map((f) => f.sp), ...this.co2.map((c) => c.sp), this.ball, ...this.sparkles.map((x) => x.sp), ...this.fogs.map((f) => f.sp), this.confetti, this.strings, this.led, ...this.ledSide.map((x) => x.m),
+      this.dj, ...this.gogos.map((d) => d.m), ...this.bartenders.map((b) => b.m), ...this.bartenders.map((b) => b.shaker)];
+    for (const o of list) if (o) o.visible = on;
+  }
+  /** Menu: AVENGERS / STARGATE / DOOM – jdou i bez party (pak jen pódium). */
+  ensure() { if (!this.active) this.start({ lite: true }); }
 
   /* ---------------- stavba ---------------- */
   build() {
@@ -379,6 +400,7 @@ export class Party {
     const rdt = dt;
     if (this.doom) { this.doomK = Math.max(0, (this.doomK ?? 1) - dt / 5.5); if (this.doomK <= 0) { this.av.update(rdt, this.beatAcc || 0); return; } dt *= this.doomK; } else this.doomK = 1;
     this.pt = (this.pt || 0) + dt;
+    if (this.lite) { this.t += dt; this.updateRunway(dt, () => new THREE.Color('#39ff14')); this.av.update(rdt, this.pt * 2); return; } // jen pódium
     this.t += dt;
     const G = this.game, F = this.fx, gy = this.gy;
     const mt = this.music && !this.music.paused ? this.music.currentTime : this.t;
@@ -603,8 +625,9 @@ export class Party {
     g.shadowBlur = 0; this.bannerT.needsUpdate = true;
   }
   /** Menu: AVENGERS / STARGATE (party se případně sama spustí). */
-  avengers() { if (!this.active) this.start(); this.av.summon(); }
-  stargate() { if (!this.active) this.start(); this.av.toggleGate(); }
+  avengers() { this.ensure(); this.av.summon(); }
+  stargate() { this.ensure(); this.av.toggleGate(); }
+  doomMenu() { this.ensure(); this.av.toggleDoom(); }
   syncStage2() { const b = this.player?.querySelector('[data-p=stage2]'); if (b) { b.classList.toggle('on', !!this.stage2); b.textContent = this.stage2 ? 'STAGE 2 ✕' : 'STAGE 2'; } }
   toggleStage2() {
     this.stage2 = !this.stage2; this.rw.goal = this.stage2 ? RW.f1 - RW.f0 : 0;

@@ -8,6 +8,25 @@ const HERO_ICONS = { iron: '🤖', cap: '🛡️', thor: '⚡', spidey: '🕷️
 const ACT_ICONS = { swapHammer: '🔨⇄', swapAxe: '🪓⇄', fly: '🚀', shoot: '💥', hammer: '🔨', axe: '🪓', pass: '🔨➜', passAxe: '🪓➜', callHammer: '🧲🔨', callAxe: '🧲🪓', bolts: '🌩️', swing: '🕸️', web: '🕷️', smash: '👊', leap: '🦘' };
 const GROUPS = [['music', '🎵'], ['light', '💡'], ['stage', '🎪'], ['hero', '🦸'], ['team', '👥'], ['gate', '🌀'], ['doom', '☠️']];
 const NUM = ['①', '②', '③', '④', '⑤', '⑥'];
+const GROUP_T = { music: 'Hudba', light: 'Světla', stage: 'Pódium', hero: 'Hrdina', team: 'Všichni hrdinové', gate: 'Hvězdná brána', doom: 'Doom' };
+const FX_T = { lasers: 'Lasery z pódia', fan: 'Laserový vějíř', ceiling: 'Laserový strop', tunnel: 'Laserový tunel', heads: 'Otočné hlavy', walls: 'Barvy na domy', strobe: 'Stroboskopy', led: 'LED stěna', flames: 'Plameny', co2: 'CO₂ výstřely', confetti: 'Konfety', ball: 'Disco koule', fog: 'Mlha', uv: 'UV světlo', beat: 'Světla do rytmu', rainbow: 'Duhové barvy', blinders: 'Oslňovače', fireworks: 'Ohňostroj', strings: 'Řetězy světel', mega: 'MEGA laser show' };
+const ACT_T = { fly: 'Vzlétni / přistaň', shoot: 'Střílej z ruky', swapHammer: 'Kladivo k druhému (Kapitán ⇄ Thor)', swapAxe: 'Sekeru k druhému (Kapitán ⇄ Thor)', bolts: 'Blesky z nebe', swing: 'Zhoupni se nad lidmi', web: 'Vystřel síť', smash: 'SMASH', leap: 'Skok do davu' };
+const HERO_T = { iron: 'Iron Man', cap: 'Kapitán Amerika', thor: 'Thor', spidey: 'Spider-Man', hulk: 'Hulk' };
+const TRACK_T = ['One More Time', 'KSN', 'GET LOW', 'Kolem Krku', 'UKA MI'];
+const CMD_T = { stage2: 'Hrdinové na STAGE 2', stage: 'Hrdinové zpět na pódium', duel: 'Duel: jen Kapitán + Thor na molo', sing: 'Hrdinové zpívají', attack: 'ÚTOK NA LIDI', rapLeave: 'Rappeři bránou pryč', rapBack: 'Rappeři bránou zpět', leave: 'Avengers bránou pryč', avBack: 'Avengers bránou zpět' };
+/** Popisek tlačítka (najetí myší / klepnutí). */
+function label(k, v, w) {
+  if (k === 'grp') return GROUP_T[v]; if (k === 'main') return 'Ovládání party';
+  switch (v) {
+    case 'prev': return 'Předchozí písnička'; case 'next': return 'Další písnička'; case 'play': return 'Přehrát / pauza'; case 'track': return TRACK_T[w];
+    case 'fx': return FX_T[w]; case 'color': return 'Další barva'; case 'style': return 'Styl světel (AUTO / DISKO / HIP HOP)'; case 'speed': return 'Rychlost světel'; case 'allOn': return 'Všechna světla zapnout'; case 'allOff': return 'Všechna světla vypnout'; case 'rnd': return 'Náhodná světla';
+    case 'stage2': return 'STAGE 2 – vysunout / zasunout molo'; case 'led3': return '3 obrazovky vedle sebe'; case 'stairs': return 'Schody ze STAGE 2';
+    case 'heroPick': return HERO_T[w]; case 'heroBack': return 'Zpět na výběr hrdiny'; case 'act': return ACT_T[w]; case 'possess': return 'Ovládat hrdinu sám'; case 'sumAll': return 'Zavolat všechny Avengers';
+    case 'cmd': return CMD_T[w]; case 'gate': return 'Hvězdná brána – otevřít / zavřít'; case 'exo': return 'Všichni bránou pryč'; case 'ret': return 'Všichni bránou zpět';
+    case 'doom': return 'DOOM – přiletí / odletí'; case 'vs': return w === 'all' ? 'Útok na Dooma: všichni' : `Útok na Dooma: ${HERO_T[w]}`; case 'end': return 'Ukončit vše';
+  }
+  return '';
+}
 
 export class PartyFab {
   constructor(party) { this.p = party; this.open = false; this.grp = null; this.heroView = null; }
@@ -31,6 +50,7 @@ export class PartyFab {
 #pfab button.off{opacity:.38}
 #pfab button.red{background:rgba(196,22,28,.6);border-color:#ff5c7a}
 #pfab .tag{position:absolute;right:-2px;bottom:-2px;font-size:9px;background:#000;border-radius:6px;padding:0 2px}
+#pfab .tip{position:absolute;right:0;bottom:calc(100% + 8px);white-space:nowrap;font:700 12px "Chakra Petch",sans-serif;color:#fff;background:rgba(8,8,14,.88);border:1px solid rgba(57,255,20,.5);border-radius:8px;padding:4px 8px;pointer-events:none;transition:opacity .2s}
 #pfab:not(.open) .col,#pfab:not(.open) .row{opacity:0;transform:translateY(10px);pointer-events:none}#pfab:not(.open) .col button,#pfab:not(.open) .row button{pointer-events:none}`;
       document.head.appendChild(css);
     }
@@ -38,7 +58,8 @@ export class PartyFab {
     document.body.classList.add('pfab-on');
     const stop = (e) => e.stopPropagation();
     for (const ev of ['pointerdown', 'touchstart', 'mousedown']) el.addEventListener(ev, stop, { passive: true });
-    el.addEventListener('click', (e) => { e.stopPropagation(); const b = e.target.closest('button'); if (b) this.tap(b.dataset); });
+    el.addEventListener('click', (e) => { e.stopPropagation(); const b = e.target.closest('button'); if (b) { const t = b.title; this.tap(b.dataset); if (t && b.dataset.k !== 'main') this.tip(t); } });
+    el.addEventListener('pointerover', (e) => { if (e.pointerType !== 'mouse') return; const b = e.target.closest('button'); if (b?.title) this.tip(b.title, 1800); });
     this.place(); this._rs = () => this.place(); addEventListener('resize', this._rs);
     this.iv = setInterval(() => { this.place(); if (this.open) this.render(); }, 700); // stav (kdo je na pódiu, Doom…) se mění i bez klepnutí
     this.render();
@@ -48,6 +69,11 @@ export class PartyFab {
     if (!this.el) return; let top = innerHeight - 190;
     for (const t of document.querySelectorAll('.tbtns, .tbtns-mma')) { const r = t.getBoundingClientRect(); if (r.height && getComputedStyle(t).opacity !== '0') top = Math.min(top, r.top); }
     this.el.style.bottom = `${Math.round(innerHeight - top + 10)}px`;
+  }
+  /** Krátký popisek nad kolečkem (na mobilu po klepnutí). */
+  tip(text, ms = 1300) {
+    if (!this.el) return; let t = this.el.querySelector('.tip'); if (!t) { t = document.createElement('div'); t.className = 'tip'; }
+    this.el.appendChild(t); t.textContent = text; t.style.opacity = 1; clearTimeout(this._tt); this._tt = setTimeout(() => { if (t) t.style.opacity = 0; }, ms);
   }
   unmount() { removeEventListener('resize', this._rs); clearInterval(this.iv); this.el?.remove(); this.el = null; document.body.classList.remove('pfab-on'); this.open = false; this.grp = null; }
 
@@ -90,21 +116,23 @@ export class PartyFab {
       case 'ret': A.startReturn(); break;
       // Doom
       case 'doom': A.toggleDoom(); break;
+      case 'end': P.stop(); return;
       case 'vs': A.attackDoom(w); break;
     }
   }
 
   render() {
     const el = this.el; if (!el) return;
-    const P = this.p, A = this.av, b = (k, v, ic, cls = '', w = '', tag = '') => `<button data-k="${k}" data-v="${v}"${w !== '' ? ` data-w="${w}"` : ''} class="${cls}" aria-label="${v}">${ic}${tag ? `<span class="tag">${tag}</span>` : ''}</button>`;
-    let h = `<div class="col">${GROUPS.map(([g, ic]) => b('grp', g, ic, this.grp === g ? 'sel' : '')).join('')}</div>`;
+    const P = this.p, A = this.av, b = (k, v, ic, cls = '', w = '', tag = '') => `<button data-k="${k}" data-v="${v}"${w !== '' ? ` data-w="${w}"` : ''} class="${cls}" title="${label(k, v, w)}" aria-label="${label(k, v, w)}">${ic}${tag ? `<span class="tag">${tag}</span>` : ''}</button>`;
+    const groups = P.lite ? GROUPS.filter(([g]) => g !== 'music' && g !== 'light') : GROUPS;
+    let h = `<div class="col">${groups.map(([g, ic]) => b('grp', g, ic, this.grp === g ? 'sel' : '')).join('')}${P.lite ? b('a', 'end', '⏹', 'red') : ''}</div>`;
     if (this.grp) {
       const items = this.items(b);
-      const gi = GROUPS.findIndex(([g]) => g === this.grp), bottom = 58 + gi * 48 - 3; // řádek u své skupiny
+      const gi = groups.findIndex(([g]) => g === this.grp), bottom = 58 + gi * 48 - 3; // řádek u své skupiny
       h += `<div class="row" style="bottom:${Math.max(0, bottom)}px">${items.join('')}</div>`;
     }
     h += b('main', 'menu', this.open ? '✕' : '🎛️', 'main');
-    el.innerHTML = h; el.classList.toggle('open', this.open);
+    const tip = el.querySelector('.tip'); el.innerHTML = h; if (tip) el.appendChild(tip); el.classList.toggle('open', this.open);
   }
   items(b) {
     const P = this.p, A = this.av, a = (v, ic, cls = '', w = '', tag = '') => b('a', v, ic, cls, w, tag);

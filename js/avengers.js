@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128005025';
+import { makeHuman, animateHuman } from './entities.js?v=20261128005303';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -28,6 +28,8 @@ const V = new THREE.Vector3();
 export class Avengers {
   constructor(party) { this.p = party; this.heroes = []; this.aim = 0; this.sel = 'cap'; this.webs = []; this.beams = []; this.flashes = []; }
   get G() { return this.p.game; }
+  /** Lidé na party (v režimu bez party nikdo). */
+  ppl() { return this.p.lite ? [] : this.p.people; }
   get top() { return this.p.gy + 1.8; }
   /** f/r (souřadnice pódia) ↔ svět */
   W(f, r) { const F = this.p.FACE, S = this.p.S; return [S.x + Math.sin(F) * f + Math.cos(F) * r, S.z + Math.cos(F) * f - Math.sin(F) * r]; }
@@ -109,7 +111,7 @@ export class Avengers {
   /** Zabije lidi v okruhu (dav party) a rozhodí je od středu. */
   blast(x, z, rad, power = 7) {
     const C = this.p.crowd; let n = 0;
-    for (const q of this.p.people) {
+    for (const q of this.ppl()) {
       if (q.gone || C.dead[q.i]) continue;
       const dx = C.x[q.i] - x, dz = C.z[q.i] - z, d = Math.hypot(dx, dz);
       if (d < rad) { const u = d || 1; C.kill(q.i, { x: dx / u, z: dz / u }, { x: (dx / u) * power, y: 4 + Math.random() * 4, z: (dz / u) * power }); n++; }
@@ -306,7 +308,7 @@ export class Avengers {
       this.stairs.spots = spots.sort((a, b) => Math.abs(a[0] - 18) - Math.abs(b[0] - 18));
     }
     const S = this.stairs; S.on = !S.on;
-    if (!S.on) { this.G.toast?.(this.exodus ? 'Schody schované – zdola se teď k bráně nikdo nedostane' : 'Schody zajíždějí – lidé slézají z pódia'); for (const q of P.people) if (q.st && !q.exit) this.sendDown(q); S.next = 0; }
+    if (!S.on) { this.G.toast?.(this.exodus ? 'Schody schované – zdola se teď k bráně nikdo nedostane' : 'Schody zajíždějí – lidé slézají z pódia'); for (const q of this.ppl()) if (q.st && !q.exit) this.sendDown(q); S.next = 0; }
     else { this.G.toast?.('🪜 Schody vyjely – lidé lezou na pódium'); S.queue = null; S.next = 0; S.wait = 2; }
     this.renderPanel();
   }
@@ -321,7 +323,7 @@ export class Avengers {
     if (!S.on || this.exodus) return;
     S.wait -= dt; if (S.wait > 0 || S.next >= S.spots.length) return;
     if (!S.queue) { // kdo je nejblíž schodům, leze první
-      S.queue = this.p.people.filter((q) => !q.bar && !q.st && !q.gone && !this.p.crowd.dead[q.i]).map((q) => [q, this.nearStair(q.x, q.z)[1]]).sort((a, b) => a[1] - b[1]).slice(0, S.spots.length + 60).map((e) => e[0]);
+      S.queue = this.ppl().filter((q) => !q.bar && !q.st && !q.gone && !this.p.crowd.dead[q.i]).map((q) => [q, this.nearStair(q.x, q.z)[1]]).sort((a, b) => a[1] - b[1]).slice(0, S.spots.length + 60).map((e) => e[0]);
     }
     S.wait = 0.055;
     const q = S.queue.shift(); if (!q || q.st || this.p.crowd.dead[q.i]) return;
@@ -337,7 +339,7 @@ export class Avengers {
     this.exodus = true; this.wantExodus = false; this.goneN = 0;
     const P = this.p, C = P.crowd, RW = P.RW, list = [];
     const gatePts = (lane) => [[...this.W(RW.f0 - 0.3, lane), this.top], [...this.W(3.0, lane * 0.6), this.top], [...this.W(2.2, lane * 0.4), this.top]];
-    for (const q of P.people) {
+    for (const q of this.ppl()) {
       if (q.gone || C.dead[q.i]) continue;
       const [x, z] = this.pos(q), lane = (Math.random() - 0.5) * 3.2;
       let path, len;
@@ -347,7 +349,7 @@ export class Avengers {
     }
     // gogo tanečnice a barmani jdou taky
     const oldX = this.extras || []; this.extras = [];
-    for (const E of [...P.gogos, ...P.bartenders]) {
+    for (const E of P.lite ? [] : [...P.gogos, ...P.bartenders]) {
       const old = oldX.find((o) => o.ref === E);
       if (old?.gone) { this.extras.push(old); continue; } // už je za bránou
       E.out = true; if (E.shaker) E.shaker.visible = false;
@@ -367,7 +369,7 @@ export class Avengers {
     const P = this.p, C = P.crowd, RW = P.RW; let k = 0, n = 0;
     const down = (hx, hz, hy, lane) => { const [s] = this.nearStair(hx, hz); return [[...this.W(s.f - 1, lane), this.top], [...this.W(s.f, s.side * 2.4), this.top], [...this.W(s.f + (Math.random() - 0.5) * 1.6, s.side * 5.9), P.gy], [hx, hz, hy]]; };
     const fromGate = (lane) => [[...this.W(3.0, lane * 0.6), this.top], [...this.W(RW.f0 - 0.3, lane), this.top]];
-    for (const q of P.people) {
+    for (const q of this.ppl()) {
       if (C.dead[q.i] || (!q.gone && !q.exit)) continue;
       const hx = q.ax != null && q.m > 0.5 ? q.ax : q.x, hz = q.ax != null && q.m > 0.5 ? q.az : q.z, lane = (Math.random() - 0.5) * 3.2;
       q.exit = false; q.back = true; q.fast = true; q.spot = null; n++;
@@ -517,7 +519,7 @@ export class Avengers {
       const gnd = G.city.ground(w.p.x, w.p.z);
       if (this.doom && this.hitDoomNear(w.p.x, w.p.z, 3, 6, null)) { w.t = 9; }
       if (w.p.y < gnd + 1.2 || w.t > 2) { // dopad: lidé v okruhu zůstanou zamotaní v síti
-        const C = P.crowd; for (const q of P.people) { if (q.gone || q.st || C.dead[q.i]) continue; if (Math.hypot(C.x[q.i] - w.p.x, C.z[q.i] - w.p.z) < 3) { q.web = 9; C.setShirt(q.i, '#ffffff'); } }
+        const C = P.crowd; for (const q of this.ppl()) { if (q.gone || q.st || C.dead[q.i]) continue; if (Math.hypot(C.x[q.i] - w.p.x, C.z[q.i] - w.p.z) < 3) { q.web = 9; C.setShirt(q.i, '#ffffff'); } }
         const net = new THREE.Mesh(new THREE.SphereGeometry(3, 12, 6, 0, Math.PI * 2, 0, Math.PI / 2), new THREE.MeshBasicMaterial({ color: '#ffffff', wireframe: true, transparent: true, opacity: 0.8 })); net.position.set(w.p.x, gnd, w.p.z); net.scale.y = 0.75; P.group.add(net); this.flashes.push({ sp: net, t: 0, s: 0, life: 9 });
         P.group.remove(w.m); this.webs.splice(i, 1);
       }
@@ -547,7 +549,7 @@ export class Avengers {
   }
   attackAi(H, dt, t) {
     if (H.cool > 0) return;
-    const P = this.p, C = P.crowd, alive = P.people.filter((q) => !q.gone && !q.st && !C.dead[q.i]);
+    const P = this.p, C = P.crowd, alive = this.ppl().filter((q) => !q.gone && !q.st && !C.dead[q.i]);
     if (!alive.length) return;
     const tgt = alive[Math.floor(Math.random() * alive.length)], a = Math.atan2(C.x[tgt.i] - H.x, C.z[tgt.i] - H.z);
     const saveAim = this.aim; this.aim = a - P.FACE; // míří na vybraného člověka
@@ -588,7 +590,7 @@ export class Avengers {
     it.spark.visible = true; it.spark.position.copy(o.position); it.spark.material.opacity = 0.6 + Math.random() * 0.4;
     it.bolt.visible = it === this.hammer && !this.doom && Math.random() < 0.6;
     if (it.bolt.visible) { const bp = it.bolt.geometry.attributes.position, gnd = this.p.gy + 1.7; for (let k = 0; k < 7; k++) { const a = k / 6; bp.setXYZ(k, o.position.x + (Math.random() - 0.5) * 1.6 * Math.sin(a * Math.PI), o.position.y + (gnd - o.position.y) * a, o.position.z + (Math.random() - 0.5) * 1.6 * Math.sin(a * Math.PI)); } bp.needsUpdate = true; }
-    if (F.kill) { const C = this.p.crowd; for (const q of this.p.people) { if (q.gone || C.dead[q.i]) continue; const dx = C.x[q.i] - o.position.x, dz = C.z[q.i] - o.position.z; if (dx * dx + dz * dz < 2.2 && Math.abs(C.y[q.i] + 1.2 - o.position.y) < 2.6) C.kill(q.i, { x: F.d.x, z: F.d.z }, { x: F.d.x * 7 + (Math.random() - 0.5) * 4, y: 5, z: F.d.z * 7 + (Math.random() - 0.5) * 4 }); } }
+    if (F.kill) { const C = this.p.crowd; for (const q of this.ppl()) { if (q.gone || C.dead[q.i]) continue; const dx = C.x[q.i] - o.position.x, dz = C.z[q.i] - o.position.z; if (dx * dx + dz * dz < 2.2 && Math.abs(C.y[q.i] + 1.2 - o.position.y) < 2.6) C.kill(q.i, { x: F.d.x, z: F.d.z }, { x: F.d.x * 7 + (Math.random() - 0.5) * 4, y: 5, z: F.d.z * 7 + (Math.random() - 0.5) * 4 }); } }
   }
 
 
@@ -848,6 +850,7 @@ export class Avengers {
       const b = e.target.closest('button'); if (!b) return; const D = b.dataset;
       if (D.x === 'min') { d.classList.toggle('collapsed'); return; }
       if (D.x === 'close') { d.remove(); this.pnl = null; return; }
+      if (D.x === 'end') { this.p.stop(); return; }
       if (D.tab) { this.tab = D.tab; d.classList.remove('collapsed'); this.renderPanel(); return; }
       if (D.sum) this.summon(D.sum === 'all' ? null : D.sum);
       if (D.sel) { this.sel = D.sel; this.renderPanel(); }
@@ -870,7 +873,7 @@ export class Avengers {
     if (live.length && !this.hero(this.sel)) this.sel = live[0].id;
     const gs = this.gate?.st, gOpen = gs === 'open', gUp = gs && gs !== 'down' && gs !== 'lower', dm = this.doom;
     const tab = this.tab || 'hero', tb = (k, l) => `<button class="tb${tab === k ? ' on' : ''}" data-tab="${k}">${l}</button>`;
-    let h = `<h3><span class="tabs">${tb('hero', '🦸 Hrdina')}${tb('team', '👥 Všichni')}${tb('gate', '🌀 Brána')}${tb('doom', '☠ Doom')}</span><span><button class="x" data-x="min">–</button><button class="x" data-x="close">✕</button></span></h3><div class="body">`;
+    let h = `<h3><span class="tabs">${tb('hero', '🦸 Hrdina')}${tb('team', '👥 Všichni')}${tb('gate', '🌀 Brána')}${tb('doom', '☠ Doom')}</span><span>${this.p.lite ? '<button class="x" data-x="end" title="Ukončit vše (pódium zmizí)">⏹</button>' : ''}<button class="x" data-x="min" title="Zmenšit">–</button><button class="x" data-x="close" title="Zavřít ovladač">✕</button></span></h3><div class="body">`;
     const miss = HEROES.filter((x) => !this.hero(x.id));
     const call = miss.length ? `<div class="r"><span>Zavolat</span>${miss.map((x) => `<button data-sum="${x.id}">+ ${x.name.replace('Kapitán Amerika', 'Kapitán')}</button>`).join('')}${miss.length > 1 ? `<button class="go" data-sum="all">🦸 Všechny</button>` : ''}</div>` : '';
     if (tab === 'hero') {
@@ -879,7 +882,7 @@ export class Avengers {
         const H = this.hero(this.sel);
         h += call;
         h += `<div class="r">${live.map((x) => `<button data-sel="${x.id}"${on(x.id === this.sel)}>${x.name.replace('Kapitán Amerika', 'Kapitán')}${this.ctrl === x ? ' 🎮' : ''}</button>`).join('')}</div>`;
-        h += `<div class="r">${ABIL[H.id].map(([a, l]) => `<button data-act="${a}">${l}</button>`).join('')}</div>`;
+        h += `<div class="r">${ABIL[H.id].map(([a, l]) => `<button data-act="${a}" title="${{ swapHammer: 'Kladivo k druhému (Kapitán ⇄ Thor)', swapAxe: 'Sekeru k druhému (Kapitán ⇄ Thor)' }[a] || l}">${l}</button>`).join('')}</div>`;
         h += `<div class="r"><button data-pos="1"${on(this.ctrl === H)}>${this.ctrl === H ? '🎮 Pustit (L)' : '🎮 Ovládat'}</button><span class="info">🔨 ${this.hero(this.hammer.holder)?.name.split(' ')[0] || '—'} · 🪓 ${this.hero(this.axe.holder)?.name.split(' ')[0] || '—'}</span></div>`;
       }
     } else if (tab === 'team') {
