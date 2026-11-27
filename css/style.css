@@ -274,3 +274,6 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
   62%, 100% { transform: none; opacity: 1; filter: none; z-index: 3; }
 }
 @media (prefers-reduced-motion: reduce) { .gate, .logo-stage .logo { animation: none !important; } .gate { z-index: 0; } }
+/* záře jen na VINÁRNA a jen lehce, VŽDYCKY bez záře */
+.logo span { text-shadow: 0 3px 0 rgba(0,0,0,.45) !important; }
+.logo b { text-shadow: 0 0 6px rgba(57,255,20,.18), 0 3px 0 rgba(0,0,0,.45) !important; }
