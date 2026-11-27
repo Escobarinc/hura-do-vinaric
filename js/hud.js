@@ -1,4 +1,4 @@
-import { fmtMoney } from './util.js?v=20261127150345';
+import { fmtMoney } from './util.js?v=20261127150536';
 
 const $ = (id) => document.getElementById(id);
 const MAP_SCALE = 0.5; // px na metr v předrenderované mapě
@@ -182,7 +182,7 @@ export class Hud {
     g.translate(W / 2, Hh * 0.6);
     g.rotate(game.camYaw + Math.PI);
     g.fillStyle = '#ffd23f';
-    g.font = '800 11px "Manrope", sans-serif';
+    g.font = '800 11px "Chakra Petch", sans-serif';
     g.textAlign = 'center';
     const R = Math.min(W, Hh) * 0.5 - 8;
     g.translate(0, -R);
@@ -204,12 +204,12 @@ export class Hud {
     const P = game.focus();
     const mark = (x, z, col, r, label) => {
       g.fillStyle = col; g.beginPath(); g.arc((x + H) * k, (z + H) * k, r, 0, 7); g.fill();
-      if (label) { g.fillStyle = '#eef2f5'; g.font = `700 ${Math.round(size / 75)}px "Manrope", sans-serif`; g.fillText(label, (x + H) * k + r + 3, (z + H) * k + 4); }
+      if (label) { g.fillStyle = '#eef2f5'; g.font = `700 ${Math.round(size / 75)}px "Chakra Petch", sans-serif`; g.fillText(label, (x + H) * k + r + 3, (z + H) * k + 4); }
     };
     for (const l of game.landmarks) mark(l.x, l.z, '#ffd23f', size / 260, l.label);
     if (game.waypoint) mark(game.waypoint.x, game.waypoint.z, '#b98cff', size / 120);
     mark(P.x, P.z, '#ffffff', size / 110);
-    mark(P.x, P.z, '#ff6a1a', size / 200);
+    mark(P.x, P.z, '#2bff88', size / 200);
     c.onclick = (ev) => {
       const r = c.getBoundingClientRect();
       const x = ((ev.clientX - r.left) / r.width) * H * 2 - H;

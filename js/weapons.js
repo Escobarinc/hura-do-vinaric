@@ -129,7 +129,7 @@ export class Weapons {
 #xhair:before{left:12px;top:0;width:2px;height:26px}#xhair:after{top:12px;left:0;height:2px;width:26px}
 #xhair i{position:absolute;left:10px;top:10px;width:6px;height:6px;border-radius:50%;border:1px solid #fff;box-shadow:0 0 2px #000}
 #wpn{position:fixed;left:50%;bottom:max(18px,env(safe-area-inset-bottom));transform:translateX(-50%);z-index:30;pointer-events:none;
-font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;white-space:nowrap}
+font:700 13px "Chakra Petch",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:6px 12px;white-space:nowrap}
 #wpn b{color:#ffd23f}#wpn span{opacity:.6;font-weight:600}`;
     document.head.appendChild(css);
     this.xhair = document.createElement('div'); this.xhair.id = 'xhair'; this.xhair.innerHTML = '<i></i>';

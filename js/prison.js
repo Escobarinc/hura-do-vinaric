@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127150345';
-import { labelTexture } from './textures.js?v=20261127150345';
-import { Crowd } from './crowd.js?v=20261127150345';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261127150536';
+import { labelTexture } from './textures.js?v=20261127150536';
+import { Crowd } from './crowd.js?v=20261127150536';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1212,19 +1212,19 @@ export class PrisonLife {
   makeButtons() {
     const css = document.createElement('style');
     css.textContent = `#prison-btns{position:absolute;left:16px;top:max(14px,env(safe-area-inset-top));display:flex;flex-wrap:wrap;gap:6px;max-width:min(560px,70vw);pointer-events:auto;z-index:25}
-#prison-btns button{font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px;cursor:pointer}
-#prison-btns button:hover{background:rgba(255,106,26,.55)}
-#prison-btns .pb-toggle{display:none;background:rgba(255,106,26,.85)}
+#prison-btns button{font:700 13px "Chakra Petch",sans-serif;color:#eef2f5;background:rgba(14,18,23,.78);border:1px solid rgba(255,255,255,.14);border-radius:10px;padding:7px 11px;cursor:pointer}
+#prison-btns button:hover{background:rgba(43,255,136,.8);color:#04140b}
+#prison-btns .pb-toggle{display:none;background:rgba(43,255,136,.85);color:#04140b}
 @media (pointer: coarse),(max-width:700px){#prison-btns{flex-direction:column;align-items:flex-start;max-width:60vw;left:max(10px,env(safe-area-inset-left))}#prison-btns .pb-toggle{display:block}#prison-btns:not(.open) button:not(.pb-toggle){display:none}#prison-btns button{font-size:14px;padding:9px 13px}#prison-btns .pb-toggle{font-size:13px;padding:8px 10px}#meal-pick{top:60px;left:10px}}
 .mission{top:max(60px,calc(env(safe-area-inset-top) + 48px)) !important}
-#meal-pick{position:absolute;left:16px;top:96px;z-index:40;pointer-events:auto;background:rgba(14,18,23,.94);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;font:600 14px "Manrope",sans-serif;color:#eef2f5;width:min(330px,86vw)}
+#meal-pick{position:absolute;left:16px;top:96px;z-index:40;pointer-events:auto;background:rgba(14,18,23,.94);border:1px solid rgba(255,255,255,.14);border-radius:14px;padding:12px 14px;font:600 14px "Chakra Petch",sans-serif;color:#eef2f5;width:min(330px,86vw)}
 #meal-pick h3{margin:0 0 8px;font-size:16px}
 #meal-pick label{display:flex;align-items:center;gap:8px;padding:5px 2px;cursor:pointer}
 #meal-pick label span{opacity:.6;font-weight:600;margin-left:auto;font-size:12.5px}
-#meal-pick input{width:18px;height:18px;accent-color:#ff6a1a}
+#meal-pick input{width:18px;height:18px;accent-color:#2bff88}
 #meal-pick .row{display:flex;gap:6px;margin-top:10px}
-#meal-pick .row button{font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:7px 10px;cursor:pointer}
-#meal-pick .row .go{background:#ff6a1a;flex:1}`;
+#meal-pick .row button{font:700 13px "Chakra Petch",sans-serif;color:#eef2f5;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.14);border-radius:9px;padding:7px 10px;cursor:pointer}
+#meal-pick .row .go{background:#2bff88;color:#04140b;flex:1}`;
     document.head.appendChild(css);
     const box = document.createElement('div');
     box.id = 'prison-btns';

@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127150345';
-import { Crowd } from './crowd.js?v=20261127150345';
-import { PrisonFX } from './prisonfx.js?v=20261127150345';
+import { makeHuman, animateHuman } from './entities.js?v=20261127150536';
+import { Crowd } from './crowd.js?v=20261127150536';
+import { PrisonFX } from './prisonfx.js?v=20261127150536';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -256,12 +256,12 @@ export class MMA {
   /* ---------------- HUD ---------------- */
   makeHud() {
     const css = document.createElement('style'); css.id = 'mma-css';
-    css.textContent = `#mma-hud{position:fixed;left:50%;top:max(12px,env(safe-area-inset-top));transform:translateX(-50%);z-index:40;pointer-events:none;width:min(580px,94vw);font:800 13px "Manrope",sans-serif;color:#fff;text-align:center}
+    css.textContent = `#mma-hud{position:fixed;left:50%;top:max(12px,env(safe-area-inset-top));transform:translateX(-50%);z-index:40;pointer-events:none;width:min(580px,94vw);font:800 13px "Chakra Petch",sans-serif;color:#fff;text-align:center}
 #mma-hud .row{display:flex;align-items:center;gap:8px}#mma-hud .bar{flex:1;height:16px;background:rgba(0,0,0,.6);border:1px solid rgba(255,255,255,.35);border-radius:4px;overflow:hidden;display:flex}
 #mma-hud .bar i{display:block;height:100%;transition:width .15s}#mma-hud .b i{background:linear-gradient(90deg,#2b5fd8,#79a8ff)}#mma-hud .r{justify-content:flex-end}#mma-hud .r i{background:linear-gradient(270deg,#d82b2b,#ff8a7a)}
 #mma-hud .mid{min-width:96px;background:rgba(0,0,0,.75);border-radius:6px;padding:3px 6px;font-size:12px}#mma-hud .nm{display:flex;justify-content:space-between;margin-top:3px;text-shadow:0 1px 3px #000;font-size:12px}
 #mma-hud .st{margin-top:6px;background:rgba(0,0,0,.65);display:inline-block;padding:4px 10px;border-radius:8px;font-size:13px;max-width:94vw}
-#mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Manrope",sans-serif;color:#fff;background:#c8452c;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}`;
+#mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#2bff88;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}`;
     document.head.appendChild(css);
     const d = document.createElement('div'); d.id = 'mma-hud';
     d.innerHTML = '<div class="row"><div class="bar b"><i id="mma-b"></i></div><div class="mid" id="mma-mid"></div><div class="bar r"><i id="mma-r"></i></div></div><div class="nm"><span id="mma-bn"></span><span id="mma-rn"></span></div><div class="st" id="mma-st"></div>';
@@ -271,11 +271,11 @@ export class MMA {
     document.body.appendChild(b); this.endBtn = b;
     if (!this.playAs) {
       const c = document.createElement('button'); c.id = 'mma-cam'; c.textContent = '🎥 Kamera arény (V)';
-      c.style.cssText = 'position:fixed;right:16px;bottom:62px;z-index:41;pointer-events:auto;font:800 14px Manrope,sans-serif;color:#fff;background:rgba(14,18,23,.85);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 14px;cursor:pointer';
+      c.style.cssText = 'position:fixed;right:16px;bottom:62px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:rgba(14,18,23,.85);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 14px;cursor:pointer';
       c.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCam(); c.blur(); });
       document.body.appendChild(c); this.camBtn = c;
       const pb = document.createElement('button'); pb.textContent = '🥊 Hraj za vězně';
-      pb.style.cssText = 'position:fixed;right:16px;bottom:108px;z-index:41;pointer-events:auto;font:800 14px Manrope,sans-serif;color:#fff;background:#c8452c;border:0;border-radius:10px;padding:9px 14px;cursor:pointer';
+      pb.style.cssText = 'position:fixed;right:16px;bottom:108px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#2bff88;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer';
       pb.addEventListener('click', (e) => { e.stopPropagation(); this.takeOver(); });
       document.body.appendChild(pb); this.playBtn = pb;
     }
