@@ -1,10 +1,10 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127141810';
-import { PrisonLife } from './prison.js?v=20261127141810';
-import { Weapons } from './weapons.js?v=20261127141810';
-import { MMA } from './mma.js?v=20261127141810';
-import { PrisonFX } from './prisonfx.js?v=20261127141810';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127141810';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127142210';
+import { PrisonLife } from './prison.js?v=20261127142210';
+import { Weapons } from './weapons.js?v=20261127142210';
+import { MMA } from './mma.js?v=20261127142210';
+import { PrisonFX } from './prisonfx.js?v=20261127142210';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127142210';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -970,6 +970,7 @@ export class Game {
 
   /* --------------- policie --------------- */
   updatePolice(dt) {
+    if (this.mode === 'mma') return; // během zápasu policie nezasahuje
     const F = this.focus();
     const want = this.wanted === 0 ? 0 : Math.min(6, this.wanted + (this.wanted > 2 ? 1 : 0));
     if (this.police.length < want && Math.random() < dt * 0.8) this.spawnPolice();

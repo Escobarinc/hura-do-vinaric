@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127141810';
-import { Crowd } from './crowd.js?v=20261127141810';
-import { PrisonFX } from './prisonfx.js?v=20261127141810';
+import { makeHuman, animateHuman } from './entities.js?v=20261127142210';
+import { Crowd } from './crowd.js?v=20261127142210';
+import { PrisonFX } from './prisonfx.js?v=20261127142210';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -586,7 +586,7 @@ export class MMA {
     this.camP.lerp(new THREE.Vector3(px, py, pz), Math.min(1, dt * 3));
     cam.position.copy(this.camP); cam.up.set(0, 1, 0); cam.lookAt(tx, ty, tz);
   }
-  focusPt() { const f = this.me || this.red?.[0]; return f ? { x: f.x, y: f.y, z: f.z } : { x: C.x, y: 0, z: C.z }; }
+  focusPt() { const f = this.me || this.red?.[0]; return { x: f ? f.x : C.x, y: f ? f.y : this.gy || 0, z: f ? f.z : C.z, vx: 0, vz: 0, v: 0, h: f ? f.h : 0, hp: 100 }; }
 
   finish() {
     const G = this.game;
