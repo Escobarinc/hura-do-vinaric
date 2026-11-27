@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127143823';
-import { Crowd } from './crowd.js?v=20261127143823';
-import { PrisonFX } from './prisonfx.js?v=20261127143823';
+import { makeHuman, animateHuman } from './entities.js?v=20261127144046';
+import { Crowd } from './crowd.js?v=20261127144046';
+import { PrisonFX } from './prisonfx.js?v=20261127144046';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -176,6 +176,22 @@ export class MMA {
     const m = makeHuman({ ...opts, scale: 1.05, tint: false });
     this.game.scene.add(m);
     const bone = (n) => { let b = null; m.traverse((o) => { if (!b && o.name === n) b = o; }); return b; };
+    // MMA rukavice na obou pěstech (bachaři modré, vězni červené, rozhodčí bez)
+    if (team) {
+      m.updateMatrixWorld(true);
+      const col = team === 'blue' ? '#1f4fc4' : '#c41f1f';
+      for (const n of ['Fist.L', 'Fist.R']) {
+        const b = bone(n); if (!b) continue;
+        const ws = new THREE.Vector3(); b.getWorldScale(ws); const k = 1 / (ws.x || 1);
+        const glove = new THREE.Group();
+        const pad = new THREE.Mesh(new THREE.SphereGeometry(0.075, 12, 10), new THREE.MeshStandardMaterial({ color: col, roughness: 0.45 }));
+        pad.scale.set(1, 0.9, 1.15);
+        const cuff = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.055, 0.06, 10), new THREE.MeshStandardMaterial({ color: '#111', roughness: 0.6 }));
+        cuff.position.y = -0.06;
+        glove.add(pad, cuff); glove.scale.setScalar(k);
+        b.add(glove);
+      }
+    }
     return {
       m, name, team, x: 0, z: 0, y: 0, h: 0, hp: 100, act: 'idle', actT: 0, cool: 1, hitDone: false, landed: 0, kickN: 0,
       bones: { ulR: bone('UpperLeg.R'), llR: bone('LowerLeg.R'), uaL: bone('UpperArm.L'), uaR: bone('UpperArm.R'), torso: bone('Torso'), fistR: bone('Fist.R') },
@@ -484,7 +500,7 @@ export class MMA {
     blade.position.z = 0.15;
     const handle = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.035, 0.11), new THREE.MeshStandardMaterial({ color: '#222' }));
     k.add(blade, handle);
-    if (f.bones.fistR) { f.bones.fistR.add(k); k.scale.setScalar(1 / (f.m.children[0]?.scale.x || 1)); k.position.set(0, 0.05 / (f.m.children[0]?.scale.x || 1), 0); }
+    if (f.bones.fistR) { f.m.updateMatrixWorld(true); const ws = new THREE.Vector3(); f.bones.fistR.getWorldScale(ws); const sc = 1 / (ws.x || 1); f.bones.fistR.add(k); k.scale.setScalar(sc); k.position.set(0, 0.05 * sc, 0); }
     else { k.position.set(0.3, 1.1, 0.3); f.m.add(k); }
     this.knife = k;
     this.game.toast?.('🔪 Vytáhl jsi nůž! Myš / F = bodnout');
