@@ -5,9 +5,9 @@
  * Hrát za vězně: WASD pohyb, myš / F rána, G / Q kop, Shift kryt, O = vytáhne nůž (podvod).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261127151238';
-import { Crowd } from './crowd.js?v=20261127151238';
-import { PrisonFX } from './prisonfx.js?v=20261127151238';
+import { makeHuman, animateHuman } from './entities.js?v=20261127151419';
+import { Crowd } from './crowd.js?v=20261127151419';
+import { PrisonFX } from './prisonfx.js?v=20261127151419';
 
 const C = { x: -222, z: 1152 }; // střed oktagonu
 const R = 5.4; // poloměr oktagonu (k vrcholu)
@@ -261,8 +261,14 @@ export class MMA {
 #mma-hud .bar i{display:block;height:100%;transition:width .15s}#mma-hud .b i{background:linear-gradient(90deg,#2b5fd8,#79a8ff)}#mma-hud .r{justify-content:flex-end}#mma-hud .r i{background:linear-gradient(270deg,#d82b2b,#ff8a7a)}
 #mma-hud .mid{min-width:96px;background:rgba(0,0,0,.75);border-radius:6px;padding:3px 6px;font-size:12px}#mma-hud .nm{display:flex;justify-content:space-between;margin-top:3px;text-shadow:0 1px 3px #000;font-size:12px}
 #mma-hud .st{margin-top:6px;background:rgba(0,0,0,.65);display:inline-block;padding:4px 10px;border-radius:8px;font-size:13px;max-width:94vw}
-#mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}`;
+#mma-end{position:fixed;right:16px;bottom:16px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer}
+@media (pointer:coarse),(max-width:700px){
+#mma-hud{top:calc(max(12px,env(safe-area-inset-top)) + 46px);width:94vw;font-size:11px}#mma-hud .bar{height:12px}#mma-hud .mid{min-width:78px;font-size:11px}#mma-hud .nm{font-size:11px}#mma-hud .st{font-size:12px}
+#mma-end,#mma-cam,#mma-play{bottom:auto!important;top:calc(max(12px,env(safe-area-inset-top)) + 128px)!important;font-size:12px!important;padding:6px 9px!important;border-radius:8px!important}
+#mma-play{right:auto!important;left:10px!important}#mma-cam{right:auto!important;left:50%!important;transform:translateX(-50%)}#mma-end{right:10px!important}
+body.mma-on .hud-left,body.mma-on #beta-badge,body.mma-on .toast{display:none!important}}`;
     document.head.appendChild(css);
+    document.body.classList.add('mma-on');
     const d = document.createElement('div'); d.id = 'mma-hud';
     d.innerHTML = '<div class="row"><div class="bar b"><i id="mma-b"></i></div><div class="mid" id="mma-mid"></div><div class="bar r"><i id="mma-r"></i></div></div><div class="nm"><span id="mma-bn"></span><span id="mma-rn"></span></div><div class="st" id="mma-st"></div>';
     document.body.appendChild(d); this.hud = d;
@@ -274,7 +280,7 @@ export class MMA {
       c.style.cssText = 'position:fixed;right:16px;bottom:62px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:rgba(14,18,23,.85);border:1px solid rgba(255,255,255,.2);border-radius:10px;padding:9px 14px;cursor:pointer';
       c.addEventListener('click', (e) => { e.stopPropagation(); this.toggleCam(); c.blur(); });
       document.body.appendChild(c); this.camBtn = c;
-      const pb = document.createElement('button'); pb.textContent = '🥊 Hraj za vězně';
+      const pb = document.createElement('button'); pb.id = 'mma-play'; pb.textContent = '🥊 Hraj za vězně';
       pb.style.cssText = 'position:fixed;right:16px;bottom:108px;z-index:41;pointer-events:auto;font:800 14px "Chakra Petch",sans-serif;color:#fff;background:#39ff14;color:#04140b;border:0;border-radius:10px;padding:9px 14px;cursor:pointer';
       pb.addEventListener('click', (e) => { e.stopPropagation(); this.takeOver(); });
       document.body.appendChild(pb); this.playBtn = pb;
@@ -671,7 +677,7 @@ export class MMA {
     for (const cr of [this.crowd, this.guards]) if (cr) { cr.hideAll(true); G.scene.remove(cr.group); }
     for (const d of this.dogs || []) G.scene.remove(d.m);
     for (const pr of this.hidden || []) { if (!pr.broken) pr.obj.visible = true; if (pr.obst && pr._r != null) pr.obst.r = pr._r; }
-    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); this.playBtn?.remove(); document.getElementById('mma-css')?.remove();
+    this.hud?.remove(); this.endBtn?.remove(); this.camBtn?.remove(); this.playBtn?.remove(); document.getElementById('mma-css')?.remove(); document.body.classList.remove('mma-on');
     PrisonFX.voiceEl()?.pause();
     if (G.mode === 'mma') {
       G.mode = 'foot';
