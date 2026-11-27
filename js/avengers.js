@@ -5,7 +5,7 @@
  * a průchod lidí bránou. Vše stojí na pódiu z party.js (souřadnice f = vpřed od pódia, r = do strany).
  */
 import * as THREE from 'three';
-import { makeHuman, animateHuman } from './entities.js?v=20261128000204';
+import { makeHuman, animateHuman } from './entities.js?v=20261128000431';
 
 const HEROES = [
   { id: 'iron', name: 'Iron Man', model: 'Casual_Male', shirt: '#b3121d', pants: '#8f0e17', hat: '#b3121d', skin: '#e0a800', scale: 1.3, r: -6, speed: 4 },
@@ -543,12 +543,21 @@ export class Avengers {
     const core = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 160, 12, 1, true), gm('#b6ffa6', 0.35)); core.position.set(x, y + 80, z); g.add(core);
     const ring = new THREE.Mesh(new THREE.RingGeometry(2.2, 2.9, 40), gm('#39ff14', 0.9)); ring.rotation.x = -Math.PI / 2; ring.position.set(x, y + 0.06, z); g.add(ring);
     const cloak = new THREE.MeshBasicMaterial({ color: '#17a33a', side: THREE.DoubleSide, toneMapped: false });
-    const cape = new THREE.Mesh(new THREE.PlaneGeometry(1.5, 2.1, 1, 4), cloak); cape.geometry.translate(0, -0.9, 0); g.add(cape);
+    const cape = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 1.0, 2.35, 16, 1, true, 0.42, Math.PI * 2 - 0.84), new THREE.MeshBasicMaterial({ color: '#0f7a2a', side: THREE.DoubleSide, toneMapped: false })); cape.geometry.translate(0, -1.05, 0); g.add(cape); // plášť kolem těla, vpředu rozevřený
     const hood = new THREE.Mesh(new THREE.SphereGeometry(0.42, 14, 10, 0, Math.PI * 2, 0, Math.PI * 0.6), cloak); g.add(hood);
-    const eyes = [-0.11, 0.11].map((ex) => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.06, 8, 6), new THREE.MeshBasicMaterial({ color: '#d8ffd0', toneMapped: false })); g.add(e); return [e, ex]; });
+    // zelená plechová maska: vypouklý plát přes obličej, štěrbiny pro oči, mřížka přes ústa, nýty
+    const mask = new THREE.Group(), tin = new THREE.MeshBasicMaterial({ color: '#2fae4a', toneMapped: false, side: THREE.DoubleSide }), tinD = new THREE.MeshBasicMaterial({ color: '#157a2c', toneMapped: false }), blk = new THREE.MeshBasicMaterial({ color: '#020402', toneMapped: false });
+    mask.add(new THREE.Mesh(new THREE.SphereGeometry(0.35, 18, 12, Math.PI / 2 - 1.0, 2.0, 0.7, 1.45), tin));
+    const brow = new THREE.Mesh(new THREE.BoxGeometry(0.46, 0.05, 0.06), tinD); brow.position.set(0, 0.13, 0.33); mask.add(brow);
+    const nose = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.07), tinD); nose.position.set(0, -0.01, 0.35); mask.add(nose);
+    for (const ex of [-0.12, 0.12]) { const sl = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.05, 0.03), blk); sl.position.set(ex, 0.06, 0.335); mask.add(sl); }
+    for (let k = -2; k <= 2; k++) { const gr = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.11, 0.03), blk); gr.position.set(k * 0.05, -0.17, 0.315 - Math.abs(k) * 0.012); mask.add(gr); }
+    for (const [rx2, ry2] of [[-0.24, 0.16], [0.24, 0.16], [-0.26, -0.08], [0.26, -0.08], [-0.17, -0.24], [0.17, -0.24]]) { const rv = new THREE.Mesh(new THREE.SphereGeometry(0.022, 6, 5), tinD); rv.position.set(rx2, ry2, Math.sqrt(Math.max(0.01, 0.35 * 0.35 - rx2 * rx2 - ry2 * ry2)) + 0.005); mask.add(rv); }
+    mask.scale.setScalar(1.7); g.add(mask);
+    const eyes = [-0.11, 0.11].map((ex) => { const e = new THREE.Mesh(new THREE.SphereGeometry(0.032, 8, 6), new THREE.MeshBasicMaterial({ color: '#eaffe4', toneMapped: false })); g.add(e); return [e, ex + Math.sign(ex) * 0.01]; });
     const light = new THREE.PointLight('#39ff14', 5200, 46, 1.25); light.position.set(x, y + 4, z); g.add(light);
     const tag = label('DOOM', '#39ff14'); tag.material.toneMapped = false; tag.material.color.set('#7dff5c'); g.add(tag);
-    this.doom = { st: 'fall', t: 0, hp: 300, x, z, y, m, b, g, beam, core, ring, cape, hood, eyes, light, tag, cy: y + 95, scale: 1.7, hitT: 0, cool: 0 };
+    this.doom = { st: 'fall', t: 0, hp: 300, x, z, y, m, b, g, beam, core, ring, cape, hood, mask, eyes, light, tag, cy: y + 95, scale: 1.7, hitT: 0, cool: 0 };
     m.position.set(x, y + 95, z); m.rotation.y = P.FACE;
     // zelené blesky kolem sloupu světla
     this.doom.bolts = Array.from({ length: 12 }, () => { // každý blesk = svazek 5 čar vedle sebe, aby byl tlustý a jasný
@@ -642,8 +651,8 @@ export class Avengers {
     D.m.updateMatrixWorld(true);
     const h = D.m.rotation.y, sy = Math.sin(h), cy = Math.cos(h), s = D.scale, py = D.m.position.y;
     const at = (o, bone, ox, oy, oz, fy) => { if (D.b[bone]) D.b[bone].getWorldPosition(V); else V.set(D.x, py + fy * s, D.z); o.position.set(V.x + (cy * ox + sy * oz) * s, V.y + oy * s, V.z + (-sy * ox + cy * oz) * s); o.rotation.y = h; };
-    at(D.cape, 'torso', 0, 0.55, -0.26, 0.9); D.cape.rotation.x = D.st === 'stand' ? 0.12 + Math.sin(D.t * 2) * 0.05 : -0.7;
-    at(D.hood, 'head', 0, 0.2, -0.03, 1.35); for (const [e, ex] of D.eyes) at(e, 'head', ex, 0.2, 0.3, 1.35);
+    at(D.cape, 'torso', 0, 0.42, 0, 0.9); D.cape.rotation.x = D.st === 'stand' ? 0 : -0.18; D.cape.scale.set(1 + Math.sin(D.t * 1.7) * 0.03, 1, D.st === 'stand' ? 1 : 1.25);
+    at(D.hood, 'head', 0, 0.2, -0.03, 1.35); at(D.mask, 'head', 0, 0.2, 0, 1.35); for (const [e, ex] of D.eyes) at(e, 'head', ex, 0.26, 0.345, 1.35);
     D.tag.position.set(D.x, py + 1.76 * s + 0.7, D.z);
     // zelené blesky: při sestupu čím dál hustší, po přistání občas; každý úder blýskne a zahřmí
     D.boltT = Math.max(0, D.boltT - dt);
@@ -660,7 +669,7 @@ export class Avengers {
       } else if (B.l.visible && Math.random() < 0.3) B.l.material.opacity = 0.4 + Math.random() * 0.6;
     }
     D.light.position.set(D.x, py + 3, D.z); D.light.intensity = 5200 * (0.85 + Math.sin(D.t * 5) * 0.15) * (D.hitT > 0 ? 1.8 : 1) * (D.boltT > 0 ? 3.2 : 1);
-    D.beam.material.opacity = 0.2 + Math.sin(D.t * 3) * 0.05; D.core.material.opacity = D.st === 'stand' ? 0.12 : 0.4; D.beam.rotation.y += dt * 0.4;
+    D.beam.material.opacity = (D.st === 'stand' ? 0.07 : 0.2) + Math.sin(D.t * 3) * 0.03; D.core.material.opacity = D.st === 'stand' ? 0.03 : 0.4; D.beam.rotation.y += dt * 0.4;
     D.ring.scale.setScalar(1 + Math.sin(D.t * 2.5) * 0.08);
   }
   /** Konec Dooma: poražen (výbuch) nebo odlétá; světla a hudba se vrátí. */

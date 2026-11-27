@@ -10,9 +10,9 @@
  * Souřadnice světa: x = východ, z = jih (čísla budov podle podklady/veznice_budovy.jpg).
  */
 import * as THREE from 'three';
-import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261128000204';
-import { labelTexture } from './textures.js?v=20261128000204';
-import { Crowd } from './crowd.js?v=20261128000204';
+import { Vehicle, makeKitCar, makeBusMesh, makeHuman, animateHuman } from './entities.js?v=20261128000431';
+import { labelTexture } from './textures.js?v=20261128000431';
+import { Crowd } from './crowd.js?v=20261128000431';
 
 // barvy oblečení – ústavní oděv vězňů a uniforma dozorců (upravit podle skutečnosti)
 export const UNIFORM = { shirt: '#3f4f63', pants: '#34404f' };
@@ -1257,6 +1257,7 @@ export class PrisonLife {
   }
   /** Restart areálu: zmizí mrtvoly a krev, skončí vzpoura, požár, autobusy, koně i výdej jídla. */
   resetAll() {
+    if (this.game.party?.active) this.game.party.stop(); // konec party včetně Dooma (jinak by zůstala tma)
     if (this.game.mma?.active) this.game.mma.finish();
     if (this.riot) this.riot = null;
     this.riotCrowd?.hideAll(true); this.policeCrowd?.hideAll(true);
