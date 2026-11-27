@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261126122659';
-import { buildWorld } from './world.js?v=20261126122659';
-import { loadModels } from './models.js?v=20261126122659';
-import { Game } from './game.js?v=20261126122659';
-import { Hud } from './hud.js?v=20261126122659';
-import { Input } from './input.js?v=20261126122659';
-import { PrisonFX } from './prisonfx.js?v=20261126122659';
-import { Audio } from './audio.js?v=20261126122659';
-import { clamp, lerp, nextFrame } from './util.js?v=20261126122659';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127131105';
+import { buildWorld } from './world.js?v=20261127131105';
+import { loadModels } from './models.js?v=20261127131105';
+import { Game } from './game.js?v=20261127131105';
+import { Hud } from './hud.js?v=20261127131105';
+import { Input } from './input.js?v=20261127131105';
+import { PrisonFX } from './prisonfx.js?v=20261127131105';
+import { Audio } from './audio.js?v=20261127131105';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127131105';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -187,8 +187,8 @@ async function run(city, progress) {
   if (input.touch) $('touch').hidden = false;
   input.enabled = true;
   hud.toast(input.touch
-    ? 'Vítej na náměstí ve Vinařicích! Vedle stojí sportovní auto, dodávka, policie, hasiči a vrtulník – dojdi k nim a ťukni na E.'
-    : 'Vítej na náměstí ve Vinařicích! Vedle stojí sportovní auto, dodávka, policie, hasiči a vrtulník – dojdi k nim a stiskni E.');
+    ? 'Vítej ve věznici Vinařice! U budovy C stojí auto, motorka a vrtulník – ťukni na E. Akce najdeš v menu ☰ Věznice.'
+    : 'Vítej ve věznici Vinařice! U budovy C stojí auto, motorka a vrtulník – stiskni E. Akce spustíš tlačítky vlevo nahoře.');
   game.msgT = 9;
 
   addEventListener('resize', () => {

@@ -1,9 +1,9 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261126122659';
-import { PrisonLife } from './prison.js?v=20261126122659';
-import { Weapons } from './weapons.js?v=20261126122659';
-import { PrisonFX } from './prisonfx.js?v=20261126122659';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeHuman, animateHuman, steerTo } from './entities.js?v=20261126122659';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127131105';
+import { PrisonLife } from './prison.js?v=20261127131105';
+import { Weapons } from './weapons.js?v=20261127131105';
+import { PrisonFX } from './prisonfx.js?v=20261127131105';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127131105';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
@@ -74,6 +74,8 @@ export class Game {
     this.prisonLife = new PrisonLife(this);
     this.weapons = new Weapons(this);
     try { this.prisonFx = new PrisonFX(this); } catch (e) { console.warn('vylepšení věznice', e); }
+    // start uvnitř věznice Vinařice (u budovy C, vedle auto, motorka a vrtulník)
+    if (city.prison) { this.arrivePrison(true); this.camFar = true; }
   }
 
   /* =============== SPAWN =============== */
@@ -214,7 +216,8 @@ export class Game {
     if (this.heli) { this.heli.rotor = 0; this.heli.vx = this.heli.vz = this.heli.vy = 0; this.heli.dead = false; this.heli.hp = 100; this.heli.mesh.rotation.x = this.heli.mesh.rotation.z = 0; }
     this.player.mesh.visible = true;
     this.spawnLineup();
-    this.hud.bigMsg('RESTART', 'Zpátky na náměstí ve Vinařicích');
+    if (this.city.prison) { this.arrivePrison(true); this.hud.bigMsg('RESTART', 'Zpátky ve věznici Vinařice'); }
+    else this.hud.bigMsg('RESTART', 'Zpátky na náměstí ve Vinařicích');
   }
 
   /** Volba ze startovní nabídky. */
@@ -1163,10 +1166,12 @@ export class Game {
   }
 
   /** Teleport do věznice: hráč u budovy C, vedle auto, motorka a vrtulník (na hřišti D1). */
-  arrivePrison() {
+  arrivePrison(quiet = false) {
     const S = PRISON_SPAWN, c = this.city;
-    Object.assign(this.player, { x: S.x, z: S.z, y: c.surface(S.x, S.z), vy: 0, h: S.h });
-    this.camYaw = S.h;
+    // hráč se dívá k autu a vrtulníku (ne do zdi budovy C)
+    const lookH = Math.atan2((S.car[0] + S.heli[0]) / 2 - S.x, (S.car[1] + S.heli[1]) / 2 - S.z);
+    Object.assign(this.player, { x: S.x, z: S.z, y: c.surface(S.x, S.z), vy: 0, h: lookH });
+    this.camYaw = lookH;
     const car = this.lineup?.sport;
     if (car) { car.v = car.vx = car.vz = 0; car.place(S.car[0], S.car[1], S.car[2]); car.dead = false; car.hp = 100; if (!this.parked.includes(car)) this.parked.push(car); }
     if (!this.bike) {
@@ -1187,7 +1192,7 @@ export class Game {
       hv.y = c.ground(S.heli[0], S.heli[1]);
       hv.sync?.();
     }
-    this.toast('Věznice Vinařice – u budovy C stojí auto, motorka a vrtulník');
+    if (!quiet) this.toast('Věznice Vinařice – u budovy C stojí auto, motorka a vrtulník');
   }
 
   /* --------------- kamera --------------- */
