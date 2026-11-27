@@ -1,6 +1,7 @@
 import * as THREE from 'three';
-import { hash01, pointInPoly, nextFrame } from './util.js?v=20261127131105';
-import * as TX from './textures.js?v=20261127131105';
+import { hash01, pointInPoly, nextFrame } from './util.js?v=20261127133511';
+import { K_PEN } from './data.js?v=20261127133511';
+import * as TX from './textures.js?v=20261127133511';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 /* --------- pomocný buffer geometrie --------- */
@@ -1450,6 +1451,9 @@ function buildPrison(city, G, world) {
 
   // ---------- vycházkové dvory a hřiště (obkreslené z ortofota), každé oplocené ----------
   buildYards(g, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, steel);
+  // ---------- vycházkové kotce u budovy K (bez střechy, nahoře pletivo) a zadní část s psincem ----------
+  buildPenK(g, city, G, geos, boxAt, V, meshT);
+  buildBackYard(g, city, G, fence, geos, boxAt, beamGeo, V, steel, darkSteel, meshT);
 
   // ---------- strážní věže ----------
   for (const [x, z] of PRISON.towers) {
@@ -1805,6 +1809,18 @@ function buildYards(root, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, st
         root.add(bench);
       }
     }
+    // telefonní automat uprostřed strany u cesty (vedle branky), čelem do dvora
+    if (!Y.open) {
+      const sgn = { n: [0, 1], s: [0, -1], w: [1, 0], e: [-1, 0] }[Y.gate];
+      const along = Y.gate === 'n' || Y.gate === 's';
+      const lx = along ? 3.4 : gl[0] + sgn[0] * 0.55, lz = along ? gl[1] + sgn[1] * 0.55 : 3.4;
+      const [px, pz] = L(lx, lz);
+      const face = Math.atan2(ux * sgn[0] + vx * sgn[1], uz * sgn[0] + vz * sgn[1]); // směr do dvora (svět)
+      root.add(phoneBooth(px, y, pz, face));
+      const [sx, sz] = L(lx + sgn[0] * 0.75, lz + sgn[1] * 0.75);
+      (city.phones ||= []).push({ x: sx, z: sz, h: face + Math.PI, yard: Y.id });
+      city.obstacles.push({ x: px, z: pz, r: 0.35, h: 2.3 });
+    }
     // přístřešky (poloha z ortofota), natočené s dvorem
     for (const [hx, hz] of Y.huts || []) {
       const hut = new THREE.Group();
@@ -1817,6 +1833,167 @@ function buildYards(root, city, G, fence, geos, boxAt, beamGeo, V, darkSteel, st
       city.obstacles.push({ x: hx, z: hz, r: 0.3, h: 2.5 });
     }
   }
+}
+
+/** Telefonní automat pro odsouzené: sloupek, zadní deska, akustická stříška, přístroj se sluchátkem. face = kam míří přední strana. */
+function phoneBooth(x, y, z, face) {
+  const g = new THREE.Group();
+  const blue = lmMat('#1f4f8f', { roughness: 0.5, metalness: 0.2 }), grey = lmMat('#3b3f44', { metalness: 0.5, roughness: 0.45 }), black = lmMat('#141414', { roughness: 0.6 });
+  const post = new THREE.Mesh(new THREE.BoxGeometry(0.12, 2.3, 0.12), grey); post.position.set(0, 1.15, -0.1);
+  const back = new THREE.Mesh(new THREE.BoxGeometry(0.95, 1.35, 0.06), blue); back.position.set(0, 1.55, -0.02);
+  // akustická stříška (půlválec) nad přístrojem
+  const hood = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.95, 16, 1, true, -Math.PI / 2, Math.PI), blue);
+  hood.material = blue.clone(); hood.material.side = THREE.DoubleSide;
+  hood.rotation.z = Math.PI / 2; hood.position.set(0, 2.2, 0.2); hood.scale.set(1, 1, 0.9);
+  const box = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.52, 0.16), grey); box.position.set(0, 1.45, 0.08);
+  const keys = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.18, 0.02), lmMat('#c9ccd0', { metalness: 0.6 })); keys.position.set(0.02, 1.38, 0.17);
+  const handset = new THREE.Mesh(new THREE.CapsuleGeometry(0.035, 0.2, 4, 8), black); handset.position.set(-0.13, 1.5, 0.19);
+  const cord = new THREE.Mesh(new THREE.CylinderGeometry(0.008, 0.008, 0.3, 4), black); cord.position.set(-0.13, 1.3, 0.18);
+  // cedulka TELEFON
+  const c = document.createElement('canvas'); c.width = 256; c.height = 64;
+  const cg = c.getContext('2d'); cg.fillStyle = '#f2f2ee'; cg.fillRect(0, 0, 256, 64); cg.fillStyle = '#1f4f8f'; cg.font = 'bold 40px sans-serif'; cg.textAlign = 'center'; cg.fillText('TELEFON', 128, 47);
+  const tt = new THREE.CanvasTexture(c); tt.colorSpace = THREE.SRGBColorSpace;
+  const sign = new THREE.Mesh(new THREE.PlaneGeometry(0.8, 0.2), new THREE.MeshStandardMaterial({ map: tt, roughness: 0.6 })); sign.position.set(0, 2.05, 0.015);
+  g.add(post, back, hood, box, keys, handset, cord, sign);
+  g.traverse((m) => { if (m.isMesh) m.castShadow = true; });
+  g.position.set(x, y, z); g.rotation.y = face;
+  return g;
+}
+
+/** Střed trojúhelníku a body kotců K v místních souřadnicích: s = napříč (0 západ … 1 východ), t = do hloubky (0 u budovy … 1 jih). */
+function penPoint(s, t) {
+  const { tl, tr, bl, br } = K_PEN;
+  const ax = tl[0] + (tr[0] - tl[0]) * s, az = tl[1] + (tr[1] - tl[1]) * s;
+  const bx = bl[0] + (br[0] - bl[0]) * s, bz = bl[1] + (br[1] - bl[1]) * s;
+  return [ax + (bx - ax) * t, az + (bz - az) * t];
+}
+
+/**
+ * Vycházkové kotce u jižního konce budovy K (podle ortofota): obvodová zeď ~4 m, uvnitř zdi do Y
+ * (od budovy ke středu a odtud do obou jižních rohů) → tři kotce. Nahoře místo střechy pletivo.
+ * Chodí tam odsouzení z „díry“ (kázeňský trest).
+ */
+function buildPenK(root, city, G, geos, boxAt, V, meshT) {
+  const H = 4.2, y = G(...penPoint(0.5, 0.5));
+  const C = penPoint(0.43, 0.3), TOP = penPoint(0.43, 0), BL = penPoint(0, 1), BR = penPoint(1, 1), TL = penPoint(0, 0), TR = penPoint(1, 0);
+  const wallM = lmMat('#e6e3db', { roughness: 0.92 });
+  const seg = (a, b, th = 0.3, h = H) => {
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    boxAt(geos.concrete, th, h + 0.6, L + th, (a[0] + b[0]) / 2, y + (h - 0.6) / 2, (a[1] + b[1]) / 2, Math.atan2(b[0] - a[0], b[1] - a[1]));
+    city.addFence(a[0], a[1], b[0], b[1], h + 3, th / 2 + 0.1);
+  };
+  seg(TL, BL, 0.35); seg(BL, BR, 0.35); seg(BR, TR, 0.35); // obvod (sever = stěna budovy K)
+  seg(TOP, C); seg(C, BL); seg(C, BR); // vnitřní zdi do Y
+  void wallM;
+  // pletivo místo stropu (ve výšce zdí), nosníky
+  const meshMat = new THREE.MeshStandardMaterial({ map: meshT.clone(), alphaTest: 0.35, side: THREE.DoubleSide, metalness: 0.5, roughness: 0.5 });
+  meshMat.map.needsUpdate = true;
+  const W = Math.hypot(TR[0] - TL[0], TR[1] - TL[1]), D = Math.hypot(BL[0] - TL[0], BL[1] - TL[1]);
+  meshMat.map.repeat.set(W / 1.0, D / 1.0);
+  const ux = (TR[0] - TL[0]) / W, uz = (TR[1] - TL[1]) / W;
+  const roof = new THREE.Mesh(new THREE.PlaneGeometry(W, D), meshMat);
+  const [cx, cz] = penPoint(0.5, 0.5);
+  roof.rotation.set(-Math.PI / 2, -Math.atan2(uz, ux), 0, 'YXZ');
+  roof.position.set(cx, y + H + 0.02, cz);
+  root.add(roof);
+  for (let k = 1; k < 6; k++) { const a = penPoint(k / 6, 0), b = penPoint(k / 6, 1); const L = Math.hypot(b[0] - a[0], b[1] - a[1]); boxAt(geos.dark, 0.1, 0.16, L, (a[0] + b[0]) / 2, y + H - 0.06, (a[1] + b[1]) / 2, Math.atan2(b[0] - a[0], b[1] - a[1])); }
+  // dveře z budovy do každého kotce
+  for (const s of [0.2, 0.43, 0.75]) { const [dx, dz] = penPoint(s === 0.43 ? 0.58 : s, 0.02); boxAt(geos.dark, 1.1, 2.2, 0.12, dx, y + 1.1, dz, Math.atan2(ux, uz)); }
+  // tři kotce (trojúhelníky / čtyřúhelníky) pro chůzi odsouzených
+  city.kPens = [
+    [TL, TOP, C, BL], // západní
+    [C, BR, BL], // jižní
+    [TOP, TR, BR, C], // východní
+  ];
+}
+
+/**
+ * Zadní (jižní) trojúhelník věznice podle ortofota: policejní psinec (hospodářské budovy a kotce se psy),
+ * dva velké stromy, sklad palet, trávník uprostřed dvora, buňka. Ostatní (hala, zdi) se nemění.
+ */
+export const BACKYARD = {
+  tri: [[-302, 1125.5], [-124, 1114], [-208, 1209]], // obrys dvora (pro povrch)
+  lawns: [
+    [[-240, 1121], [-205, 1118.6], [-204, 1141], [-238, 1143]], // trávník pod stromy
+    [[-236.7, 1156.5], [-213.6, 1154.4], [-214.3, 1168]], // trávník uprostřed dvora
+    [[-134.8, 1123.1], [-124, 1114], [-129, 1130.6], [-208.2, 1210.9], [-208.8, 1198.6]], // pás mezi plotem a vnější zdí
+  ],
+  sheds: [ // hospodářské budovy psince [x0, z0, x1, z1, výška]
+    [-184, 1120, -177.3, 1127.2, 3.0], [-173.1, 1119, -160.9, 1125.4, 3.3], [-176.9, 1125.4, -161.7, 1133.1, 3.6],
+    [-161.3, 1124.5, -154.9, 1130.9, 3.0], [-155.4, 1117, -137.9, 1125.6, 4.0], [-183.7, 1129.9, -177.2, 1132.2, 2.6],
+  ],
+  kennel: { x0: -178.5, x1: -152, z0: 1134.2, z1: 1140.6, n: 6 }, // výběhy pro psy
+  trees: [[-214, 1121, 6.5], [-210, 1132, 5.5], [-233, 1137, 4.2]],
+};
+function buildBackYard(root, city, G, fence, geos, boxAt, beamGeo, V, steel, darkSteel, meshT) {
+  const B = BACKYARD;
+  const wallM = lmMat('#d9d5cb', { roughness: 0.9 }), roofM = lmMat('#8b9299', { metalness: 0.35, roughness: 0.55 });
+  for (const [x0, z0, x1, z1, h] of B.sheds) {
+    const cx = (x0 + x1) / 2, cz = (z0 + z1) / 2, y = G(cx, cz);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h, z1 - z0), wallM); body.position.set(cx, y + h / 2, cz);
+    const roof = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + 0.4, 0.22, z1 - z0 + 0.4), roofM); roof.position.set(cx, y + h + 0.1, cz);
+    body.castShadow = body.receiveShadow = roof.castShadow = true;
+    root.add(body, roof);
+    // dveře a okna
+    boxAt(geos.dark, 1.0, 2.1, 0.1, cx - (x1 - x0) * 0.25, y + 1.05, z1 + 0.02);
+    for (let k = 0; k < Math.floor((x1 - x0) / 4); k++) boxAt(geos.dark, 1.1, 0.8, 0.08, x0 + 2.2 + k * 4, y + h * 0.62, z0 - 0.02);
+    city.addFence(x0, z0, x1, z0, h + 0.4, 0.2); city.addFence(x1, z0, x1, z1, h + 0.4, 0.2);
+    city.addFence(x1, z1, x0, z1, h + 0.4, 0.2); city.addFence(x0, z1, x0, z0, h + 0.4, 0.2);
+  }
+  // cedule psince
+  {
+    const c = document.createElement('canvas'); c.width = 512; c.height = 96;
+    const cg = c.getContext('2d'); cg.fillStyle = '#f4f2ea'; cg.fillRect(0, 0, 512, 96); cg.fillStyle = '#1b2f55'; cg.font = 'bold 44px sans-serif'; cg.textAlign = 'center'; cg.fillText('PSINEC · SLUŽEBNÍ PSI', 256, 64);
+    const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace;
+    const s = new THREE.Mesh(new THREE.PlaneGeometry(4.2, 0.8), new THREE.MeshStandardMaterial({ map: t }));
+    s.position.set(-169.3, G(-169.3, 1133.1) + 2.9, 1133.15); root.add(s);
+  }
+  // výběhy (kotce) pro psy: betonová podlaha, pletivo, plechová stříška vzadu, bouda
+  const K = B.kennel, ky = G((K.x0 + K.x1) / 2, (K.z0 + K.z1) / 2), w = (K.x1 - K.x0) / K.n;
+  const pad = new THREE.Mesh(new THREE.BoxGeometry(K.x1 - K.x0 + 0.6, 0.12, K.z1 - K.z0 + 0.6), lmMat('#b9b6ae', { roughness: 0.95 }));
+  pad.position.set((K.x0 + K.x1) / 2, ky + 0.06, (K.z0 + K.z1) / 2); pad.receiveShadow = true; root.add(pad);
+  const pts = [[K.x0, K.z0], [K.x0, K.z1], [K.x1, K.z1], [K.x1, K.z0]];
+  fence(pts, 2.2);
+  for (let k = 1; k < K.n; k++) fence([[K.x0 + k * w, K.z0], [K.x0 + k * w, K.z1]], 2.2);
+  const shelter = new THREE.Mesh(new THREE.BoxGeometry(K.x1 - K.x0, 0.1, 2.2), roofM); shelter.position.set((K.x0 + K.x1) / 2, ky + 2.35, K.z0 + 1.1); root.add(shelter);
+  const houseM = lmMat('#7a5534', { roughness: 0.85 });
+  city.dogRuns = [];
+  for (let k = 0; k < K.n; k++) {
+    const cx = K.x0 + (k + 0.5) * w;
+    const house = new THREE.Group();
+    const hb = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.8, 1.0), houseM); hb.position.y = 0.4;
+    const hr = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.08, 1.2), roofM); hr.position.y = 0.86; hr.rotation.x = 0.12;
+    const hole = new THREE.Mesh(new THREE.PlaneGeometry(0.4, 0.45), lmMat('#151515')); hole.position.set(0, 0.32, 0.505);
+    house.add(hb, hr, hole); house.position.set(cx - w * 0.22, ky + 0.12, K.z0 + 0.9); root.add(house);
+    // miska
+    const bowl = new THREE.Mesh(new THREE.CylinderGeometry(0.16, 0.12, 0.08, 12), lmMat('#9aa0a6', { metalness: 0.7 })); bowl.position.set(cx + w * 0.3, ky + 0.16, K.z1 - 0.6); root.add(bowl);
+    city.dogRuns.push({ x0: K.x0 + k * w + 0.5, x1: K.x0 + (k + 1) * w - 0.5, z0: K.z0 + 1.9, z1: K.z1 - 0.5, y: ky + 0.12 });
+  }
+  // stromy
+  const trunkM = lmMat('#5a4330', { roughness: 0.9 }), leafM = lmMat('#3f6b34', { roughness: 0.85 }), leafM2 = lmMat('#4f7c3c', { roughness: 0.85 });
+  for (const [x, z, r] of B.trees) {
+    const y = G(x, z), tr = new THREE.Group();
+    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.25, 0.4, r * 0.9, 8), trunkM); trunk.position.y = r * 0.45;
+    tr.add(trunk);
+    for (let k = 0; k < 4; k++) {
+      const c = new THREE.Mesh(new THREE.IcosahedronGeometry(r * (0.55 + Math.random() * 0.2), 1), k % 2 ? leafM : leafM2);
+      c.position.set((Math.random() - 0.5) * r * 0.6, r * (1.05 + Math.random() * 0.35), (Math.random() - 0.5) * r * 0.6);
+      c.castShadow = true; tr.add(c);
+    }
+    trunk.castShadow = true; tr.position.set(x, y, z); root.add(tr);
+    city.obstacles.push({ x, z, r: 0.45, h: r });
+  }
+  // sklad palet, sudy, kontejner, buňka
+  const palletM = lmMat('#a07a4c', { roughness: 0.9 });
+  for (const [x, z, n] of [[-212, 1128, 4], [-208.5, 1128.5, 6], [-205, 1129, 3], [-201.5, 1128.2, 5], [-197.5, 1129.5, 2], [-209, 1132.5, 3]]) {
+    for (let k = 0; k < n; k++) boxAt(geos.concrete, 1.2, 0.14, 0.8, x, G(x, z) + 0.07 + k * 0.15, z);
+  }
+  void palletM;
+  const barrelM = lmMat('#2a5bb8', { roughness: 0.5 });
+  for (const [x, z] of [[-196, 1126.5], [-195.2, 1127.4], [-196.8, 1127.6], [-194.6, 1126.4]]) { const b = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.9, 10), barrelM); b.position.set(x, G(x, z) + 0.45, z); b.castShadow = true; root.add(b); }
+  const cont = (x, z, w2, d, h, col, rot = 0) => { const m = new THREE.Mesh(new THREE.BoxGeometry(w2, h, d), lmMat(col, { roughness: 0.7, metalness: 0.3 })); m.position.set(x, G(x, z) + h / 2, z); m.rotation.y = rot; m.castShadow = true; root.add(m); city.obstacles.push({ x, z, r: Math.max(w2, d) / 2, h }); };
+  cont(-227.5, 1139.5, 2.4, 6.0, 2.5, '#7b4a2c'); // buňka u stromů
+  cont(-228, 1158, 1.6, 1.2, 1.3, '#d9b02a'); cont(-225.5, 1158.4, 1.4, 1.1, 1.2, '#2c62b0'); cont(-221.5, 1158.8, 1.0, 1.4, 1.6, '#8a9096');
 }
 
 /** Cihlový komín (Mayrau 48 m). */

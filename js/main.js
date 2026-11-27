@@ -1,13 +1,13 @@
 import * as THREE from 'three';
-import { City, fetchData, fetchTerrain } from './data.js?v=20261127131105';
-import { buildWorld } from './world.js?v=20261127131105';
-import { loadModels } from './models.js?v=20261127131105';
-import { Game } from './game.js?v=20261127131105';
-import { Hud } from './hud.js?v=20261127131105';
-import { Input } from './input.js?v=20261127131105';
-import { PrisonFX } from './prisonfx.js?v=20261127131105';
-import { Audio } from './audio.js?v=20261127131105';
-import { clamp, lerp, nextFrame } from './util.js?v=20261127131105';
+import { City, fetchData, fetchTerrain } from './data.js?v=20261127133511';
+import { buildWorld } from './world.js?v=20261127133511';
+import { loadModels } from './models.js?v=20261127133511';
+import { Game } from './game.js?v=20261127133511';
+import { Hud } from './hud.js?v=20261127133511';
+import { Input } from './input.js?v=20261127133511';
+import { PrisonFX } from './prisonfx.js?v=20261127133511';
+import { Audio } from './audio.js?v=20261127133511';
+import { clamp, lerp, nextFrame } from './util.js?v=20261127133511';
 import { Sky } from 'three/addons/objects/Sky.js';
 import { RoomEnvironment } from 'three/addons/environments/RoomEnvironment.js';
 import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
@@ -289,7 +289,7 @@ async function run(city, progress) {
     if (input.hit('Tab') || input.hit('F1')) toggleHelp();
     if (input.touch) {
       // dotyková tlačítka: popisky podle toho, co právě dělají
-      const air = game.mode === 'heli' || (game.mode === 'foot' && game.jetpack);
+      const air = game.mode === 'heli' || game.mode === 'jet' || (game.mode === 'foot' && game.jetpack);
       const st = game.mode === 'car' ? ['🛑', ''] : air ? ['▲', '▼'] : ['⤒', '🏃'];
       if (tbUp.textContent !== st[0]) tbUp.textContent = st[0];
       if (tbDown.textContent !== (st[1] || '🏃')) tbDown.textContent = st[1] || '🏃';

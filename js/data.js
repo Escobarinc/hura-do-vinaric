@@ -1,4 +1,4 @@
-import { Grid, pointInPoly, closestOnSeg } from './util.js?v=20261127131105';
+import { Grid, pointInPoly, closestOnSeg } from './util.js?v=20261127133511';
 
 export const AI_ROADS = new Set(['primary', 'primary_link', 'secondary', 'secondary_link', 'tertiary',
   'tertiary_link', 'unclassified', 'residential', 'living_street', 'busway']);
@@ -125,6 +125,18 @@ function bbox(o) {
   o.cx = (minx + maxx) / 2; o.cz = (minz + maxz) / 2;
 }
 
+/**
+ * Budova K ve věznici: v OSM obrys zahrnuje i jižní vycházkové kotce (bez střechy, nahoře pletivo).
+ * Budova končí 13,7 m před jižní stěnou obrysu; kotce staví world.js (buildPenK).
+ */
+export const K_PEN = { bl: [-165.8, 1093.4], br: [-142.9, 1090.6], tl: [-167.4, 1079.8], tr: [-144.5, 1077.0] };
+function fixPrisonFootprint(o) {
+  const p = o.p, has = (x, z) => { for (let i = 0; i < p.length; i += 2) if (Math.abs(p[i] - x) < 1 && Math.abs(p[i + 1] - z) < 1) return true; return false; };
+  if (has(-142.9, 1090.6) && has(-150.8, 1024.1) && has(-165.8, 1093.4)) {
+    o.p = new Float32Array([K_PEN.tl[0], K_PEN.tl[1], K_PEN.tr[0], K_PEN.tr[1], -150.8, 1024.1, -173.6, 1026.8, -168, 1075.5]);
+  }
+}
+
 export class City {
   constructor(raw, terrain = null) {
     this.half = raw.half;
@@ -135,6 +147,7 @@ export class City {
     if (terrain && raw.prison) flattenArea(terrain, toWorld(raw.prison), 25);
     this.buildings = raw.buildings.map((b, i) => {
       const o = { id: i, p: toWorld(b.p), k: b.k, n: b.n && b.n.replace(/\s+/g, ' ').trim(), r: b.r, rl: b.rl, ro: b.ro, lv: b.l, yr: b.y, bt: b.b };
+      fixPrisonFootprint(o);
       bbox(o);
       // výšky budov jsou absolutní: g = terén pod budovou, h = střecha, mh = spodek
       let sum = 0, mn = 1e9;
@@ -156,6 +169,21 @@ export class City {
       bbox(o);
       return o;
     });
+    // zadní dvůr věznice je celý betonový – obslužné cesty z OSM tam nekreslit (zbytek cesty zůstane)
+    {
+      const tri = [[-302, 1125.5], [-124, 1114], [-208, 1209]];
+      const inTri = (x, z) => { let c = false; for (let a = 0, b = 2; a < 3; b = a++) { const [xa, za] = tri[a], [xb, zb] = tri[b]; if ((za > z) !== (zb > z) && x < ((xb - xa) * (z - za)) / (zb - za) + xa) c = !c; } return c; };
+      const out = [];
+      for (const r of this.roads) {
+        if (r.t !== 'service') { out.push(r); continue; }
+        let part = [];
+        const flush = () => { if (part.length >= 4) { const o = { ...r, p: new Float32Array(part) }; bbox(o); out.push(o); } part = []; };
+        for (let k = 0; k < r.p.length; k += 2) { if (inTri(r.p[k], r.p[k + 1])) flush(); else part.push(r.p[k], r.p[k + 1]); }
+        flush();
+      }
+      out.forEach((r, k) => (r.id = k));
+      this.roads = out;
+    }
     this.water = raw.water.map((w) => { const o = { p: toWorld(w.p) }; bbox(o); return o; });
     this.rivers = raw.rivers.map((r) => {
       const o = { p: toWorld(r.p), n: r.n, w: RIVER_W[r.n] || (r.w > 10 ? 12 : 2) };

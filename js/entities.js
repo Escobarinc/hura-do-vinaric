@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { clamp, pick, wrapAngle } from './util.js?v=20261127131105';
-import { labelTexture } from './textures.js?v=20261127131105';
-import { KIT, kitCar, kitHuman, animateKitHuman } from './models.js?v=20261127131105';
+import { clamp, pick, wrapAngle } from './util.js?v=20261127133511';
+import { labelTexture } from './textures.js?v=20261127133511';
+import { KIT, kitCar, kitHuman, animateKitHuman } from './models.js?v=20261127133511';
 
 /* =========================================================
  *  MATERIÁLY
@@ -690,5 +690,85 @@ export function makeBikeMesh(color = '#c4161c') {
   g.add(rider);
   g.traverse((o) => { if (o.isMesh) o.castShadow = true; });
   g.userData = { L: 2.1, W: 0.8, wheels, front, rider, paint, bike: true };
+  return g;
+}
+
+/** Stíhačka (převzato z Hrej Hradec): delta křídla, dvojité kýly, plamen z trysky. */
+export function makeJet() {
+  const g = new THREE.Group();
+  const body = std('#6f7a86', { metalness: 0.45, roughness: 0.45 });
+  const dark = std('#3d444c', { metalness: 0.4, roughness: 0.5 });
+  const glass = new THREE.MeshPhysicalMaterial({ color: '#2a3a4a', roughness: 0.05, metalness: 0.3, clearcoat: 1, transparent: true, opacity: 0.85 });
+  const fus = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.7, 11, 16), body);
+  fus.rotation.x = Math.PI / 2; fus.position.set(0, 1.6, 0);
+  const nose = new THREE.Mesh(new THREE.ConeGeometry(0.85, 3.6, 16), body);
+  nose.rotation.x = Math.PI / 2; nose.position.set(0, 1.6, 7.3);
+  const can = new THREE.Mesh(new THREE.SphereGeometry(0.6, 16, 10, 0, Math.PI * 2, 0, Math.PI / 2), glass);
+  can.scale.set(1, 0.9, 2.6); can.position.set(0, 2.25, 3.2);
+  // delta křídla
+  const wing = new THREE.Shape();
+  wing.moveTo(0, 2.5); wing.lineTo(5.2, -3.2); wing.lineTo(5.2, -3.9); wing.lineTo(0, -3.9); wing.closePath();
+  const wg = new THREE.ExtrudeGeometry(wing, { depth: 0.16, bevelEnabled: false });
+  wg.rotateX(Math.PI / 2);
+  for (const sd of [1, -1]) {
+    const w = new THREE.Mesh(wg, body);
+    w.scale.x = sd; w.position.set(sd * 0.5, 1.45, 0);
+    g.add(w);
+    // ocasní plochy (dvojité kýly)
+    const fin = new THREE.Shape();
+    fin.moveTo(0, 0); fin.lineTo(1.8, 0); fin.lineTo(2.6, 2.4); fin.lineTo(1.6, 2.4); fin.closePath();
+    const fg = new THREE.ExtrudeGeometry(fin, { depth: 0.12, bevelEnabled: false });
+    const f = new THREE.Mesh(fg, dark);
+    f.rotation.y = -Math.PI / 2; f.rotation.z = sd * 0.18;
+    f.position.set(sd * 0.7, 2.1, -5.4);
+    g.add(f);
+    const intake = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.7, 2.4), dark);
+    intake.position.set(sd * 0.95, 1.4, 1.6);
+    g.add(intake);
+  }
+  const noz = new THREE.Mesh(new THREE.CylinderGeometry(0.62, 0.72, 1, 14, 1, true), dark);
+  noz.rotation.x = Math.PI / 2; noz.position.set(0, 1.6, -5.9);
+  const flameM = new THREE.MeshBasicMaterial({ color: '#ffb35a', transparent: true, opacity: 0.0, depthWrite: false });
+  const flame = new THREE.Mesh(new THREE.ConeGeometry(0.55, 4, 14), flameM);
+  flame.rotation.x = -Math.PI / 2; flame.position.set(0, 1.6, -8.3);
+  // podvozek
+  for (const [x, z] of [[0, 4.6], [1.6, -1.2], [-1.6, -1.2]]) {
+    const leg = new THREE.Mesh(new THREE.CylinderGeometry(0.07, 0.07, 1.0, 6), dark);
+    leg.position.set(x, 0.75, z);
+    const tyre = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.2, 12), tyreM);
+    tyre.rotation.z = Math.PI / 2; tyre.position.set(x, 0.3, z);
+    g.add(leg, tyre);
+  }
+  g.add(fus, nose, can, noz, flame);
+  g.traverse((o) => { if (o.isMesh && o !== flame) o.castShadow = true; });
+  g.userData = { L: 15, W: 10.4, flame, flameM };
+  return g;
+}
+
+
+/** Tank: korba s pásy, otočná věž s kanónem (věž = userData.turret, ústí = userData.muzzle). */
+export function makeTank() {
+  const g = new THREE.Group();
+  const olive = std('#4d5a34', { roughness: 0.75, metalness: 0.15 }), dark = std('#2c3220', { roughness: 0.8 }), track = std('#1b1b1a', { roughness: 0.95 });
+  const hull = new THREE.Mesh(new THREE.BoxGeometry(3.3, 1.1, 6.6), olive); hull.position.y = 1.15;
+  const glacis = new THREE.Mesh(new THREE.BoxGeometry(3.3, 0.9, 1.4), olive); glacis.position.set(0, 1.25, 3.5); glacis.rotation.x = -0.55;
+  g.add(hull, glacis);
+  for (const sd of [-1, 1]) {
+    const t = new THREE.Mesh(new THREE.BoxGeometry(0.8, 1.0, 7.0), track); t.position.set(sd * 1.75, 0.55, 0); g.add(t);
+    for (let k = 0; k < 6; k++) { const w = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.42, 0.84, 14), dark); w.rotation.z = Math.PI / 2; w.position.set(sd * 1.75, 0.5, -2.6 + k * 1.04); g.add(w); }
+    const fender = new THREE.Mesh(new THREE.BoxGeometry(0.95, 0.08, 7.1), olive); fender.position.set(sd * 1.75, 1.08, 0); g.add(fender);
+  }
+  const turret = new THREE.Group(); turret.position.set(0, 1.7, -0.3);
+  const tb = new THREE.Mesh(new THREE.CylinderGeometry(1.35, 1.55, 0.85, 8), olive); tb.position.y = 0.42;
+  const hatch = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.35, 0.12, 12), dark); hatch.position.set(0.45, 0.9, -0.3);
+  const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.12, 0.15, 4.6, 12), dark); barrel.rotation.x = Math.PI / 2; barrel.position.set(0, 0.5, 3.4);
+  const brake = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 0.5, 12), dark); brake.rotation.x = Math.PI / 2; brake.position.set(0, 0.5, 5.75);
+  const mg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.08, 0.9), dark); mg.position.set(-0.5, 1.05, 0.2);
+  const muzzle = new THREE.Object3D(); muzzle.position.set(0, 0.5, 6.1);
+  turret.add(tb, hatch, barrel, brake, mg, muzzle);
+  g.add(turret);
+  // hvězda na věži
+  g.traverse((o) => { if (o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+  g.userData = { L: 7.0, W: 3.6, turret, muzzle, top: 2.6 };
   return g;
 }

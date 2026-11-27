@@ -1,14 +1,14 @@
 import * as THREE from 'three';
-import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127131105';
-import { PrisonLife } from './prison.js?v=20261127131105';
-import { Weapons } from './weapons.js?v=20261127131105';
-import { PrisonFX } from './prisonfx.js?v=20261127131105';
-import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127131105';
+import { clamp, lerp, rand, pick, wrapAngle, closestOnSeg, pointInPoly } from './util.js?v=20261127133511';
+import { PrisonLife } from './prison.js?v=20261127133511';
+import { Weapons } from './weapons.js?v=20261127133511';
+import { PrisonFX } from './prisonfx.js?v=20261127133511';
+import { Vehicle, makeKitCar, makeCarMesh, makePoliceMesh, makeBusMesh, makeHeliMesh, makeBikeMesh, makeJet, makeTank, makeHuman, animateHuman, steerTo } from './entities.js?v=20261127133511';
 
 const ROAD_SPEED = { primary: 14, primary_link: 10, secondary: 13, secondary_link: 9, tertiary: 12, tertiary_link: 9, residential: 8.5, unclassified: 8.5, living_street: 5, busway: 9 };
 
 /** Věznice: místo u budovy C (5) a kde stojí vozidla po teleportu (souřadnice světa). */
-const PRISON_SPAWN = { x: -238, z: 1056.2, h: Math.PI, car: [-252, 1057.8, Math.PI / 2 + 0.12], bike: [-226.5, 1057.7, -Math.PI / 2 - 0.12], heli: [-250, 1069] };
+const PRISON_SPAWN = { x: -238, z: 1056.2, h: Math.PI, car: [-252, 1057.8, Math.PI / 2 + 0.12], bike: [-226.5, 1057.7, -Math.PI / 2 - 0.12], heli: [-259, 1069], jet: [-243.5, 1068.6, Math.PI / 2], tank: [-213, 1071.5, Math.PI / 2] }; // stíhačka na hřišti D1, tank na hřišti D2
 
 export const LANDMARKS = [
   ['Vinařice - náměstí', 'Náměstí ve Vinařicích'],
@@ -347,6 +347,7 @@ export class Game {
     if (this.mode === 'foot') this.updateFoot(dt);
     else if (this.mode === 'car') this.updateCar(dt);
     else if (this.mode === 'heli') this.updateHeli(dt);
+    else if (this.mode === 'jet') this.updateJet(dt);
     else if (this.mode === 'trolley') this.updateRide(dt);
 
     if (inp.hit('KeyE')) this.handleE();
@@ -517,6 +518,11 @@ export class Game {
           return;
         }
       }
+      if (this.jet && Math.hypot(this.jet.x - P.x, this.jet.z - P.z) < 8 && Math.abs(this.jet.y - P.y) < 3) {
+        this.enter(this.jet, 'jet');
+        this.toast('Stíhačka: W plyn · S brzda · A/D zatáčení · mezerník stoupat · Shift klesat');
+        return;
+      }
       if (this.heli && Math.hypot(this.heli.x - P.x, this.heli.z - P.z) < 7 && Math.abs(this.heli.y - P.y) < 3) {
         this.enter(this.heli, 'heli');
         this.toast('Mezerník stoupat · Shift klesat · W/S vpřed/vzad · A/D otáčení');
@@ -547,8 +553,9 @@ export class Game {
         if (!best.owned && Math.random() < 0.25) { this.addWanted(1); this.toast('Spustil se alarm!'); }
       }
       this.enter(best, 'car');
-    } else if (this.mode === 'car' || this.mode === 'heli') {
+    } else if (this.mode === 'car' || this.mode === 'heli' || this.mode === 'jet') {
       const v = this.vehicle;
+      if (this.mode === 'jet' && (v.y - this.city.roofHeight(v.x, v.z) > 0.8 || v.spd > 6)) { this.toast('Nejdřív přistaň a zastav'); return; }
       if (this.mode === 'car' && Math.hypot(v.vx, v.vz) > 6) { this.toast('Nejdřív zpomal'); return; }
       if (this.mode === 'heli' && (v.y - this.city.roofHeight(v.x, v.z) > 0.8 || Math.hypot(v.vx, v.vz) > 3)) { this.toast('Nejdřív přistaň'); return; }
       this.exit();
@@ -577,7 +584,8 @@ export class Game {
     const c = this.city.collide(ex, ez, 0.4, y + 0.4);
     Object.assign(this.player, { x: c.x, z: c.z, y, vy: 0, h: v.h });
     v.driver = null;
-    if (v.kind !== 'heli') { v.vx = v.vz = v.v = 0; this.parked.push(v); }
+    if (v.kind !== 'heli' && v.kind !== 'jet') { v.vx = v.vz = v.v = 0; this.parked.push(v); }
+    if (v.kind === 'jet') { v.spd = 0; v.mesh.userData.flameM.opacity = 0; }
     this.vehicle = null; this.mode = 'foot';
     this.audio.door();
   }
@@ -588,6 +596,7 @@ export class Game {
     const a = inp.axes();
     v.drive(dt, { throttle: a.y, steer: -a.x, hand: inp.down('Space') }, this.city);
     this.weapons?.runOver(v);
+    if (v.isTank) this.updateTankGun(v, dt);
     if (v.lastImpact > 6) this.audio.crash(v.lastImpact);
     if (v.dead && v.sink > 2.4) {
       this.toast('Auto skončilo v řece!');
@@ -868,7 +877,7 @@ export class Game {
       const ang = Math.abs(wrapAngle(Math.atan2(tx - v.x, tz - v.z) - v.h));
       let thr = d < 9 && this.mode === 'foot' ? -0.3 : ang > 1.2 ? 0.45 : 1;
       if (d < 12 && tSpeed < 2) thr = Math.min(thr, 0);
-      if (this.mode === 'heli') thr = d < 20 ? 0 : thr;
+      if (this.mode === 'heli' || this.mode === 'jet') thr = d < 20 ? 0 : thr;
       // zaseknutí
       if (Math.abs(v.v) < 1.2 && thr > 0) { c.stuck += dt; if (c.stuck > 1.8) { c.reverse = 1.3; c.stuck = 0; } } else c.stuck = 0;
       if (c.reverse > 0) { c.reverse -= dt; thr = -1; steer = -steer; }
@@ -1192,7 +1201,108 @@ export class Game {
       hv.y = c.ground(S.heli[0], S.heli[1]);
       hv.sync?.();
     }
-    if (!quiet) this.toast('Věznice Vinařice – u budovy C stojí auto, motorka a vrtulník');
+    this.placePrisonJet();
+    // tank na hřišti D2
+    if (!this.tank) {
+      this.tank = new Vehicle(makeTank(), 'car');
+      this.tank.label = 'Tank'; this.tank.owned = true; this.tank.isTank = true;
+      this.tank.maxV = 14; this.tank.accel = 6; this.tank.r = 2.4;
+      this.scene.add(this.tank.mesh);
+    }
+    const tk = this.tank;
+    if (this.vehicle !== tk) {
+      tk.v = tk.vx = tk.vz = 0; tk.dead = false; tk.hp = 5000; tk.burnT = null;
+      tk.place(S.tank[0], S.tank[1], S.tank[2]);
+      tk.mesh.userData.turret.rotation.y = 0;
+      if (!this.parked.includes(tk)) this.parked.push(tk);
+    }
+    if (!quiet) this.toast('Věznice Vinařice – u budovy C stojí auto, motorka, vrtulník, na hřištích stíhačka a tank');
+  }
+
+  /** Tank: věž míří tam, kam kamera; myš / F = výstřel z kanónu (raketa s výbuchem). */
+  updateTankGun(v, dt) {
+    const T = v.mesh.userData.turret, inp = this.input;
+    const want = wrapAngle(this.camYaw - v.h);
+    T.rotation.y += wrapAngle(want - T.rotation.y) * Math.min(1, dt * 4);
+    this.tankCool = (this.tankCool || 0) - dt;
+    if ((inp.hit('Mouse0') || inp.hit('KeyF') || inp.hit('KeyK')) && this.tankCool <= 0 && this.weapons) {
+      this.tankCool = 1.6;
+      const O = new THREE.Vector3(); v.mesh.userData.muzzle.getWorldPosition(O);
+      const h = v.h + T.rotation.y, D = new THREE.Vector3(Math.sin(h), Math.sin(-this.camPitch * 0.6 + 0.12), Math.cos(h)).normalize();
+      this.weapons.fireRocket(O, D, false, 95);
+      this.weapons.shake = Math.max(this.weapons.shake, 0.5);
+      v.v -= 1.5; // zpětný ráz
+    }
+  }
+
+  /** Stíhačka na hřišti D1 (svislý vzlet, takže dráhu nepotřebuje). */
+  placePrisonJet() {
+    const S = PRISON_SPAWN;
+    if (!this.jet) { this.jet = new Vehicle(makeJet(), 'jet'); this.scene.add(this.jet.mesh); }
+    const v = this.jet;
+    if (this.vehicle === v) return;
+    v.spd = 0; v.pitch = 0; v.roll = 0; v.vy = 0; v.dead = false;
+    v.place(S.jet[0], S.jet[1], S.jet[2]);
+    v.y = this.city.surface(S.jet[0], S.jet[1]);
+    v.mesh.rotation.set(0, v.h, 0);
+    v.mesh.position.set(v.x, v.y, v.z);
+    v.mesh.userData.flameM.opacity = 0;
+  }
+
+  /** Stíhačka: W/S plyn, A/D zatáčení s náklonem, mezerník/Shift stoupání a klesání. */
+  updateJet(dt) {
+    const v = this.vehicle, inp = this.input, city = this.city;
+    const a = inp.axes();
+    const MAX = 262; // ≈ 940 km/h
+    if (a.y > 0) v.spd += (40 + v.spd * 0.18) * a.y * dt;
+    else if (a.y < 0) v.spd += 70 * a.y * dt;
+    else v.spd -= 4 * dt;
+    v.spd = clamp(v.spd, 0, MAX);
+    const up = (inp.down('Space') ? 1 : 0) - (inp.down('ShiftLeft', 'ShiftRight') ? 1 : 0);
+    const ground = city.roofHeight(v.x, v.z, v.y + 2);
+    const onGround = v.y <= ground + 0.05;
+    const rollT = a.x * (v.spd > 30 ? 1.1 : 0.4);
+    v.roll += (rollT - v.roll) * Math.min(1, dt * 3);
+    const turn = v.spd > 30 ? -v.roll * 0.75 : -a.x * 1.2;
+    v.h += turn * dt;
+    const pitchT = up * 0.55;
+    v.pitch += (pitchT - v.pitch) * Math.min(1, dt * 2.5);
+    let vy;
+    if (v.spd > 45) vy = Math.sin(v.pitch) * v.spd - (v.spd < 70 ? (70 - v.spd) * 0.3 : 0);
+    else vy = up > 0 ? 9 : onGround ? 0 : up < 0 ? -9 : -3;
+    const [fx, fz] = v.forward();
+    const hs = v.spd * Math.cos(v.pitch);
+    let nx = v.x + fx * hs * dt, nz = v.z + fz * hs * dt;
+    const H = city.half - 30;
+    if (Math.abs(nx) > H || Math.abs(nz) > H) { v.h += Math.PI * dt * 0.8; nx = clamp(nx, -H, H); nz = clamp(nz, -H, H); }
+    let ny = v.y + vy * dt;
+    const c = city.collide(nx, nz, 4, ny + 1.5);
+    const g2 = city.roofHeight(nx, nz, ny + 2);
+    if ((c.hit && v.spd > 20) || (ny < g2 && (v.spd > 70 || vy < -14))) { this.crashJet(); return; }
+    if (c.hit) { nx = c.x; nz = c.z; v.spd *= 0.5; }
+    if (ny < g2) { ny = g2; if (v.pitch < 0) v.pitch = 0; }
+    v.x = nx; v.z = nz; v.y = ny;
+    v.vx = fx * hs; v.vz = fz * hs;
+    const m = v.mesh;
+    m.position.set(v.x, v.y, v.z);
+    m.rotation.order = 'YXZ';
+    m.rotation.y = v.h; m.rotation.x = -v.pitch; m.rotation.z = v.roll;
+    m.userData.flameM.opacity = Math.min(0.95, v.spd / MAX + (a.y > 0 ? 0.35 : 0));
+    m.userData.flame.scale.set(1, 0.5 + (v.spd / MAX) * 1.8, 1);
+    this.player.x = v.x; this.player.z = v.z; this.player.y = v.y;
+    this.hud.setSpeed(v.spd * 3.6, null, Math.round(v.y - city.ground(v.x, v.z)));
+  }
+
+  crashJet() {
+    const v = this.vehicle;
+    this.audio.crash(40);
+    this.weapons?.explode(new THREE.Vector3(v.x, v.y + 1, v.z), true);
+    this.hud.bigMsg('HAVÁRIE', 'Stíhačka narazila · na hřišti ve věznici čeká nová');
+    this.vehicle = null; this.mode = 'foot';
+    v.driver = null;
+    this.placePrisonJet();
+    this.player.mesh.visible = true;
+    this.wasted();
   }
 
   /* --------------- kamera --------------- */
@@ -1201,6 +1311,7 @@ export class Game {
     if (this.mode === 'foot') { const P = this.player; tx = P.x; ty = P.y + 1.6; tz = P.z; dist = this.camFar ? 11 : 6.5; }
     else if (this.mode === 'car') { const v = this.vehicle; tx = v.x; ty = v.y + 1.8; tz = v.z; dist = this.camFar ? 15 : 9.5; heading = Math.abs(v.v) > 2 ? (v.v > 0 ? v.h : v.h) : null; }
     else if (this.mode === 'heli') { const v = this.vehicle; tx = v.x; ty = v.y + 3; tz = v.z; dist = this.camFar ? 34 : 22; heading = v.h; }
+    else if (this.mode === 'jet') { const v = this.vehicle; tx = v.x; ty = v.y + 3; tz = v.z; dist = (this.camFar ? 40 : 26) + v.spd * 0.04; heading = v.h; }
     else { const v = this.ride.veh; tx = v.x; ty = v.y + 3.5; tz = v.z; dist = 18; heading = v.h; }
     // se zbraní v ruce: kamera přes pravé rameno, zaměřovač míří do prostoru vedle postavy
     const armed = this.mode === 'foot' && this.weapons?.slot > 0;
@@ -1230,8 +1341,8 @@ export class Game {
   }
 
   updateAudio() {
-    const sp = this.mode === 'car' ? Math.abs(this.vehicle.v) : this.mode === 'heli' ? -1 : 0;
-    this.audio.engine(this.mode === 'car', sp, this.mode === 'heli');
+    const sp = this.mode === 'car' ? Math.abs(this.vehicle.v) : this.mode === 'jet' ? 20 + this.vehicle.spd / 5 : this.mode === 'heli' ? -1 : 0;
+    this.audio.engine(this.mode === 'car' || this.mode === 'jet', sp, this.mode === 'heli');
     this.audio.siren(this.police.some((c) => Math.hypot(c.veh.x - this.focus().x, c.veh.z - this.focus().z) < 160) && this.wanted > 0);
   }
 
@@ -1243,6 +1354,7 @@ export class Game {
         const n = this.nextStop(t);
         return `<kbd>E</kbd> Nastoupit do autobusu ${t.line.ref}${n ? ' · směr ' + n.n : ''}`;
       }
+      if (this.jet && Math.hypot(this.jet.x - P.x, this.jet.z - P.z) < 8) return '<kbd>E</kbd> Nastoupit do stíhačky';
       if (this.heli && Math.hypot(this.heli.x - P.x, this.heli.z - P.z) < 7) return '<kbd>E</kbd> Nastoupit do vrtulníku';
       for (const v of this.parked) if (!v.dead && Math.hypot(v.x - P.x, v.z - P.z) < 4.2) return v.owned ? `<kbd>E</kbd> Nastoupit: ${v.label}` : '<kbd>E</kbd> Vloupat se do auta';
       for (const t of this.traffic) if (Math.hypot(t.veh.x - P.x, t.veh.z - P.z) < 4.2) return '<kbd>E</kbd> Ukrást auto';
@@ -1252,6 +1364,7 @@ export class Game {
     if (this.mode === 'car' && Math.hypot(this.vehicle.vx, this.vehicle.vz) < 6) return '<kbd>E</kbd> Vystoupit';
     if (this.mode === 'trolley' && this.ride.wait > 0) return '<kbd>E</kbd> Vystoupit';
     if (this.mode === 'heli' && this.vehicle.y - this.city.roofHeight(this.vehicle.x, this.vehicle.z) < 0.8) return '<kbd>E</kbd> Vystoupit';
+    if (this.mode === 'jet' && this.vehicle.spd < 6 && this.vehicle.y - this.city.roofHeight(this.vehicle.x, this.vehicle.z) < 0.8) return '<kbd>E</kbd> Vystoupit';
     return null;
   }
 }

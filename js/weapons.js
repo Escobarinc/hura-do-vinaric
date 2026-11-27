@@ -13,7 +13,9 @@ const WEAPONS = [
   { name: 'Brokovnice', icon: '💥', rate: 0.95, auto: false, pellets: 9, spread: 0.055, range: 38, sound: [0.28, 0.85, 900] },
   { name: 'Samopal', icon: '🔫', rate: 0.085, auto: true, pellets: 1, spread: 0.022, range: 95, sound: [0.07, 0.38, 2300] },
   { name: 'Granát', icon: '💣', rate: 1.1, grenade: true },
+  { name: 'Bazuka', icon: '🚀', rate: 1.3, rocket: true },
 ];
+const NW = WEAPONS.length; // počet slotů včetně „bez zbraně“
 const KILL_R = 8, PUSH_R = 13, FUSE = 2.4;
 
 function glowTexture(inner, outer) {
@@ -73,6 +75,7 @@ export class Weapons {
     this.cool = 0;
     this.corpses = [];
     this.burning = []; // hořící vraky
+    this.rockets = []; // rakety z bazuky a tanku
     this.queueBoom = []; // výbuchy zničených vozidel (až v dalším snímku, ať se neřetězí v jednom průchodu)
     this.grenades = [];
     this.fx = [];
@@ -104,7 +107,13 @@ export class Weapons {
     const shotgun = new THREE.Group(); shotgun.add(box(0.06, 0.07, 0.75, dark, 0, 0.02, 0.2), box(0.07, 0.1, 0.32, wood, 0, -0.02, -0.25), box(0.06, 0.05, 0.25, wood, 0, -0.03, 0.3));
     const smg = new THREE.Group(); smg.add(box(0.06, 0.09, 0.42, dark, 0, 0.02, 0.08), box(0.04, 0.18, 0.05, dark, 0, -0.1, 0.12), box(0.05, 0.1, 0.05, dark, 0, -0.05, -0.05), box(0.04, 0.05, 0.2, dark, 0, 0.0, -0.2));
     const nade = new THREE.Group(); const gb = new THREE.Mesh(new THREE.SphereGeometry(0.06, 12, 10), new THREE.MeshStandardMaterial({ color: '#3f4a2c', roughness: 0.6 })); nade.add(gb);
-    this.gunMeshes = [null, pistol, shotgun, smg, nade];
+    // bazuka: zelená trubka na rameni s mířidlem a rukojetí
+    const olive = new THREE.MeshStandardMaterial({ color: '#4b5a32', roughness: 0.6, metalness: 0.2 });
+    const bazooka = new THREE.Group();
+    const tube = new THREE.Mesh(new THREE.CylinderGeometry(0.075, 0.075, 1.25, 14, 1, true), olive); tube.material.side = THREE.DoubleSide; tube.rotation.x = Math.PI / 2; tube.position.set(0, 0.16, 0.12);
+    const bell = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.08, 0.18, 14, 1, true), olive); bell.rotation.x = Math.PI / 2; bell.position.set(0, 0.16, -0.55);
+    bazooka.add(tube, bell, box(0.04, 0.14, 0.05, dark, 0, 0.03, 0.18), box(0.04, 0.12, 0.05, dark, 0, 0.04, -0.05), box(0.03, 0.06, 0.08, dark, 0.07, 0.25, 0.3));
+    this.gunMeshes = [null, pistol, shotgun, smg, nade, bazooka];
     this.hand = new THREE.Group();
     this.hand.position.set(-0.26, 1.18, 0.38);
     for (const m of this.gunMeshes) if (m) { m.visible = false; this.hand.add(m); }
@@ -132,8 +141,8 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.xhair.style.display = show && w ? 'block' : 'none';
     this.label.style.display = show ? 'block' : 'none';
     this.label.innerHTML = w
-      ? `${w.icon} <b>${w.name}</b> <span>· K / myš = ${w.grenade ? 'hod' : 'střelba'} · Q / kolečko = další zbraň · 1–4 · 0 schovat</span>`
-      : '<span>Zbraně: Q nebo kolečko myši · 1 pistole · 2 brokovnice · 3 samopal · 4 granát</span>';
+      ? `${w.icon} <b>${w.name}</b> <span>· K / myš = ${w.grenade ? 'hod' : 'střelba'} · Q / kolečko = další zbraň · 1–5 · 0 schovat</span>`
+      : '<span>Zbraně: Q nebo kolečko myši · 1 pistole · 2 brokovnice · 3 samopal · 4 granát · 5 bazuka</span>';
   }
 
   /* ---------- cíle ---------- */
@@ -464,6 +473,55 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.grenades.push({ mesh, vel, t: 0 });
     G.audio?.blip?.(300, 0.08, 'triangle', 0.08, -120);
   }
+  /** Bazuka: raketa letí tam, kam míří kamera. */
+  fireBazooka() {
+    const G = this.game, cam = G.camera, D = new THREE.Vector3();
+    cam.getWorldDirection(D);
+    const P = G.player, O = cam.position.clone();
+    const along = (P.x - O.x) * D.x + (P.y + 1.4 - O.y) * D.y + (P.z - O.z) * D.z;
+    O.addScaledVector(D, Math.max(0, along) + 1.2);
+    this.fireRocket(O, D, false);
+    this.shake = Math.max(this.shake, 0.25);
+  }
+  /** Raketa z bodu O ve směru D (bazuka i tank); po zásahu výbuch. */
+  fireRocket(O, D, npc = false, speed = 70) {
+    const mesh = new THREE.Group();
+    const body = new THREE.Mesh(new THREE.CylinderGeometry(0.06, 0.06, 0.6, 10), new THREE.MeshStandardMaterial({ color: '#4b5a32', roughness: 0.5 }));
+    const tip = new THREE.Mesh(new THREE.ConeGeometry(0.06, 0.2, 10), new THREE.MeshStandardMaterial({ color: '#2b2b2b' }));
+    body.rotation.x = Math.PI / 2; tip.rotation.x = Math.PI / 2; tip.position.z = 0.4;
+    const glowM = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.fireT, blending: THREE.AdditiveBlending, depthWrite: false, transparent: true }));
+    glowM.position.z = -0.4; glowM.scale.set(0.7, 0.7, 1);
+    mesh.add(body, tip, glowM);
+    mesh.position.copy(O);
+    mesh.lookAt(O.clone().add(D));
+    this.scene.add(mesh);
+    this.rockets.push({ mesh, D: D.clone().normalize(), speed, t: 0, npc });
+    this.flash.position.copy(O); this.flash.visible = true; this.flashT0 = 0.08;
+    this.game.audio?.noise?.(0.45, 0.8, 600); this.game.audio?.blip?.(180, 0.4, 'sawtooth', 0.12, -100);
+  }
+  updateRockets(dt) {
+    const city = this.game.city;
+    for (let i = this.rockets.length - 1; i >= 0; i--) {
+      const r = this.rockets[i], m = r.mesh;
+      r.t += dt;
+      const step = r.speed * dt;
+      const hit = this.cast(m.position, r.D, step + 0.5);
+      const P = m.position;
+      let boom = null;
+      if (hit.vehicle || hit.target || hit.wall) boom = hit.p;
+      else if (P.y < city.surface(P.x, P.z) + 0.1 || r.t > 4) boom = P.clone();
+      if (boom) {
+        this.scene.remove(m); this.rockets.splice(i, 1);
+        if (hit.vehicle) this.wreck(hit.vehicle);
+        this.explode(boom, r.npc);
+        continue;
+      }
+      P.addScaledVector(r.D, step);
+      r.D.y -= 0.6 * dt / r.speed; // nepatrný pokles
+      if (Math.random() < 0.9) this.dust.emit(P.x - r.D.x * 0.5, P.y - r.D.y * 0.5, P.z - r.D.z * 0.5, (Math.random() - 0.5) * 0.4, 0.3 + Math.random() * 0.4, (Math.random() - 0.5) * 0.4, 1.2, -0.3);
+    }
+  }
+
   /** Granát hozený odjinud (policie): oblouk z bodu o do bodu t. */
   throwFrom(o, t, npc = true) {
     const T = 1.25, vel = new THREE.Vector3((t.x - o.x) / T, (t.y - o.y) / T + 4.9 * T, (t.z - o.z) / T);
@@ -589,10 +647,10 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
   update(dt) {
     const G = this.game, inp = G.input;
     let pick = null;
-    for (let k = 0; k <= 4; k++) if (inp.hit('Digit' + k) || inp.hit('Numpad' + k)) pick = k;
-    // Q / kolečko myši: další zbraň dokola (0 → 1 → 2 → 3 → 4 → 0)
-    if (inp.hit('KeyQ')) pick = (this.slot + 1) % 5;
-    if (inp.wheel) { pick = (this.slot + (inp.wheel > 0 ? 1 : 4)) % 5; inp.wheel = 0; }
+    for (let k = 0; k < NW; k++) if (inp.hit('Digit' + k) || inp.hit('Numpad' + k)) pick = k;
+    // Q / kolečko myši: další zbraň dokola (0 → 1 → … → bazuka → 0)
+    if (inp.hit('KeyQ')) pick = (this.slot + 1) % NW;
+    if (inp.wheel) { pick = (this.slot + (inp.wheel > 0 ? 1 : NW - 1)) % NW; inp.wheel = 0; }
     if (pick !== null && pick !== this.slot) {
       this.slot = pick;
       G.audio?.blip?.(500 + pick * 60, 0.05, 'square', 0.04);
@@ -612,7 +670,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
       const want = w.auto ? inp.mouseBtn || inp.down('KeyK') || inp.down('KeyF') || inp.down('KeyM') : inp.hit('Mouse0') || inp.hit('KeyK') || inp.hit('KeyF') || inp.hit('KeyM');
       if (want && this.cool <= 0) {
         this.cool = w.rate;
-        if (w.grenade) this.throwGrenade(); else this.fire();
+        if (w.grenade) this.throwGrenade(); else if (w.rocket) this.fireBazooka(); else this.fire();
       }
     }
     const ground = (x, z) => G.city.surface(x, z);
@@ -623,6 +681,7 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
     this.updateCasings(dt);
     this.updateGrenades(dt);
     this.updateBurning(dt);
+    this.updateRockets(dt);
     this.updateFx(dt);
     this.shake = Math.max(0, this.shake - dt * 1.8);
     this.hudT = (this.hudT || 0) - dt;
@@ -633,6 +692,8 @@ font:700 13px "Manrope",sans-serif;color:#eef2f5;background:rgba(14,18,23,.72);b
   clearAll() {
     for (const v of this.burning) for (const sp of v.flames) this.scene.remove(sp);
     this.burning.length = 0; this.queueBoom.length = 0;
+    for (const r of this.rockets) this.scene.remove(r.mesh);
+    this.rockets.length = 0;
     for (const c of this.corpses) {
       if (c.poolPerson) { c.poolPerson.dead = false; c.poolPerson.used = false; c.mesh.visible = false; c.mesh.rotation.set(0, 0, 0); }
       else this.scene.remove(c.mesh);

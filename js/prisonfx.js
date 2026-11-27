@@ -10,10 +10,11 @@
  * Souřadnice světa: x = východ, z = jih.
  */
 import * as THREE from 'three';
-import { Crowd } from './crowd.js?v=20261127131105';
-import { makeHuman, animateHuman } from './entities.js?v=20261127131105';
-import { labelTexture } from './textures.js?v=20261127131105';
-import { pointInPoly } from './util.js?v=20261127131105';
+import { Crowd } from './crowd.js?v=20261127133511';
+import { makeHuman, animateHuman } from './entities.js?v=20261127133511';
+import { labelTexture } from './textures.js?v=20261127133511';
+import { BACKYARD } from './world.js?v=20261127133511';
+import { pointInPoly } from './util.js?v=20261127133511';
 
 const AREA = { x0: -462, x1: -42, z0: 988, z1: 1236 }; // obdélník kolem areálu
 const DOORS = [ // vchody, odkud vychází oddíly (plechové dveře se stříškou)
@@ -80,6 +81,17 @@ export class PrisonFX {
     }
     og.putImageData(id, 0, 0);
     const P = (wx, wz) => [(wx - x0) * px, (wz - z0) * px];
+    // zadní trojúhelník (psinec): čistý beton a trávníky podle ortofota místo zrnitého rozpoznání z barev
+    {
+      const poly = (pts, fill) => { og.fillStyle = fill; og.beginPath(); pts.forEach((q, i) => (i ? og.lineTo(...P(q[0], q[1])) : og.moveTo(...P(q[0], q[1])))); og.closePath(); og.fill(); };
+      poly(BACKYARD.tri, '#a8a69f');
+      for (const l of BACKYARD.lawns) poly(l, '#66884a');
+      og.save(); og.beginPath(); BACKYARD.tri.forEach((q, i) => (i ? og.lineTo(...P(q[0], q[1])) : og.moveTo(...P(q[0], q[1])))); og.closePath(); og.clip();
+      for (let i = 0; i < 9000; i++) { // zrno betonu a trávy
+        const xx = rnd() * OW, yy = rnd() * OH; og.fillStyle = `rgba(${rnd() < 0.5 ? '40,40,36' : '255,255,250'},${(rnd() * 0.12).toFixed(3)})`; og.fillRect(xx, yy, 2, 2);
+      }
+      og.restore();
+    }
     // spáry betonových desek (po 4 m) a praskliny
     og.strokeStyle = 'rgba(40,38,34,.22)'; og.lineWidth = 1.2;
     for (let wx = Math.ceil(x0 / 4) * 4; wx < x1; wx += 4) { og.beginPath(); og.moveTo(...P(wx, z0)); og.lineTo(...P(wx, z1)); og.stroke(); }
@@ -303,6 +315,23 @@ export class PrisonFX {
       for (const [lx, lz] of [[-gym.W / 2 + 4, -3.5], [-gym.W / 2 + 8, -3.5], [gym.W / 2 - 6, 3.5]]) this.actors.push({ id: id++, kind: 'pullup', f: gym, lx, lz, ph: Math.random() * 6 });
       for (let k = 0; k < 4; k++) this.actors.push({ id: id++, kind: 'idle', f: gym, lx: (Math.random() - 0.5) * gym.W * 0.6, lz: (Math.random() - 0.5) * gym.H * 0.5, h: Math.random() * 6 });
     }
+    // telefonují: u každého automatu jeden odsouzený (ruka u ucha)
+    for (const ph of this.city.phones || []) this.actors.push({ id: id++, kind: 'phone', x: ph.x, z: ph.z, h: ph.h });
+    // kotce u budovy K: pár odsouzených z „díry“ chodí sem a tam
+    const pens = this.city.kPens || [];
+    const inPen = (pen) => { // náhodný bod uvnitř mnohoúhelníku (trojúhelníky od prvního vrcholu)
+      const tris = []; for (let i = 1; i + 1 < pen.length; i++) tris.push([pen[0], pen[i], pen[i + 1]]);
+      const [a, b, c] = tris[Math.floor(Math.random() * tris.length)];
+      let u = Math.random(), v = Math.random(); if (u + v > 1) { u = 1 - u; v = 1 - v; }
+      const x = a[0] + (b[0] - a[0]) * u + (c[0] - a[0]) * v, z = a[1] + (b[1] - a[1]) * u + (c[1] - a[1]) * v;
+      // kousek dovnitř k těžišti, ať nechodí po zdi
+      const gx = pen.reduce((s2, q) => s2 + q[0], 0) / pen.length, gz = pen.reduce((s2, q) => s2 + q[1], 0) / pen.length;
+      return [x + (gx - x) * 0.25, z + (gz - z) * 0.25];
+    };
+    this.penPoint = inPen;
+    [[0, 1], [1, 1], [2, 2]].forEach(([pi, n]) => { const pen = pens[pi]; if (!pen) return; for (let k = 0; k < n; k++) { const [x, z] = inPen(pen); this.actors.push({ id: id++, kind: 'pen', pen, x, z, t: inPen(pen), h: 0, wait: Math.random() * 3 }); } });
+    // psi ve výbězích psince
+    this.kennelDogs = (this.city.dogRuns || []).map((r) => { const m = this.makeDog(); const x = (r.x0 + r.x1) / 2, z = (r.z0 + r.z1) / 2; m.position.set(x, r.y, z); return { m, r, x, z, tx: x, tz: z, wait: Math.random() * 4, ph: Math.random() * 6 }; });
     for (const f of ovals) {
       for (let k = 0; k < 7; k++) this.actors.push({ id: id++, kind: 'oval', f, a: (k / 7) * Math.PI * 2, sp: 0.9 + Math.random() * 0.4 });
       // kuřáci u přístřešků
@@ -359,12 +388,43 @@ export class PrisonFX {
         C.set(a.id, x, G(x, z), z, Math.atan2(wx, wz), a.sp, 'walk', t);
       } else if (a.kind === 'smoke') {
         C.set(a.id, a.x, G(a.x, a.z), a.z, a.h, 0, 'smoke', t);
+      } else if (a.kind === 'phone') {
+        C.set(a.id, a.x, G(a.x, a.z), a.z, a.h, 0, 'smoke', t); // ruka u ucha = sluchátko
+      } else if (a.kind === 'pen') {
+        let v = 0;
+        if (a.wait > 0) a.wait -= dt;
+        else {
+          const dx = a.t[0] - a.x, dz = a.t[1] - a.z, d = Math.hypot(dx, dz);
+          if (d < 0.3) { a.t = this.penPoint(a.pen); a.wait = 1 + Math.random() * 4; }
+          else { v = 0.9; a.x += (dx / d) * v * dt; a.z += (dz / d) * v * dt; a.h = Math.atan2(dx, dz); }
+        }
+        C.set(a.id, a.x, G(a.x, a.z), a.z, a.h, v, 'walk', t);
       }
     }
     C.commit();
+    this.updateKennelDogs(dt, t);
   }
 
   /* ---------------- hlídky: psovod se psem, dva dozorci ---------------- */
+  /** Psi ve výbězích: přecházejí, vrtí ocasem, na blízkého hráče štěkají a skáčou na pletivo. */
+  updateKennelDogs(dt, t) {
+    const P = this.game.focus?.() || this.game.player;
+    for (const d of this.kennelDogs || []) {
+      const near = Math.hypot(P.x - d.x, P.z - d.z) < 14;
+      if (near) { d.tx = Math.max(d.r.x0, Math.min(d.r.x1, P.x)); d.tz = d.r.z1; }
+      else if ((d.wait -= dt) <= 0) { d.tx = d.r.x0 + Math.random() * (d.r.x1 - d.r.x0); d.tz = d.r.z0 + Math.random() * (d.r.z1 - d.r.z0); d.wait = 2 + Math.random() * 5; }
+      const dx = d.tx - d.x, dz = d.tz - d.z, dist = Math.hypot(dx, dz), v = dist > 0.2 ? Math.min(near ? 3 : 1.2, dist * 2) : 0;
+      if (dist > 0.05) { d.x += (dx / dist) * v * dt; d.z += (dz / dist) * v * dt; }
+      const h = near && dist < 0.3 ? Math.atan2(P.x - d.x, P.z - d.z) : dist > 0.05 ? Math.atan2(dx, dz) : d.m.rotation.y;
+      d.m.rotation.y = h;
+      const jump = near && dist < 0.3 ? Math.max(0, Math.sin(t * 7 + d.ph)) * 0.35 : 0;
+      d.m.position.set(d.x, d.r.y + jump, d.z);
+      const sw = v > 0 ? Math.sin(t * 12 + d.ph) * 0.5 : 0;
+      d.m.userData.legs.forEach((l, i) => (l.rotation.x = (i % 2 ? sw : -sw)));
+      d.m.userData.tail.rotation.z = Math.sin(t * 10 + d.ph) * 0.5;
+      if (near && Math.random() < dt * 0.6) this.bark();
+    }
+  }
   makeDog() {
     const g = new THREE.Group(), fur = new THREE.MeshStandardMaterial({ color: '#3b2a1c', roughness: 0.9 }), tan = new THREE.MeshStandardMaterial({ color: '#8a5a2e', roughness: 0.9 });
     const body = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.3, 0.8), fur); body.position.y = 0.55;
