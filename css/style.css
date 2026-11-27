@@ -206,3 +206,6 @@ kbd { font-family: var(--font); font-weight: 700; font-size: .78em; padding: .12
   .fc b { font-size: 13px; } .fc span { font-size: 11px; }
 }
 .feat .fc:last-child { grid-column: span 2; aspect-ratio: auto; } /* vyplní poslední řádek */
+#menu .lead { max-width: 700px; font-size: 15.5px; }
+#menu .lead b { color: var(--brick-hi); font-weight: 800; }
+#menu .claim { font-family: "Unbounded", var(--font); }
